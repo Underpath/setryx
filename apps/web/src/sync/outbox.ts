@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import type { SessionUpload, TargetUpdates } from '@setryx/shared';
+import { useLocation } from 'react-router';
+import { type PlayerState, type SessionUpload, type TargetUpdates, sessionUploadOf } from '@setryx/shared';
 import { api, ApiRequestError } from '../api.ts';
+import { loadFinished, removeFinished } from '../player/storage.ts';
 
 // Things the device has to tell the server, kept on the device until the
 // server confirms them. Uploads are idempotent (sessions have a fixed id), so
@@ -37,6 +39,15 @@ function writeOutbox(userId: string, items: OutboxItem[]): void {
 export function enqueue(userId: string, item: NewOutboxItem): void {
   const items = readOutbox(userId).filter((i) => i.id !== item.id);
   writeOutbox(userId, [...items, { ...item, attempts: 0 } as OutboxItem]);
+}
+
+/** Queues a finished session (and any target updates) for the server and takes it off the review list. */
+export function saveFinished(state: PlayerState, targets?: TargetUpdates): void {
+  enqueue(state.userId, { id: `session:${state.id}`, kind: 'session', sessionId: state.id, label: state.workoutName, body: sessionUploadOf(state) });
+  if (targets?.updates.length && state.workoutId) {
+    enqueue(state.userId, { id: `targets:${state.id}`, kind: 'targets', workoutId: state.workoutId, label: state.workoutName, body: targets });
+  }
+  removeFinished(state.userId, state.id);
 }
 
 export function dropFromOutbox(userId: string, id: string): void {
@@ -102,6 +113,20 @@ export function useOutbox(userId: string): OutboxItem[] {
  */
 export function SyncRunner({ userId }: { userId: string }) {
   const items = useOutbox(userId);
+  const { pathname } = useLocation();
+
+  // Leaving the review screen counts as done: any finished session that isn't
+  // on screen right now is saved as it is (target updates need a tick, so none).
+  // Runs on navigation only: a workout that just finished is still on the
+  // player route until it moves on to its review.
+  useEffect(() => {
+    if (pathname.startsWith('/play')) return;
+    const reviewing = pathname.match(/^\/review\/([^/]+)/)?.[1];
+    const left = loadFinished(userId).filter((s) => s.id !== reviewing);
+    for (const s of left) saveFinished(s);
+    if (left.length) void flushOutbox(userId);
+  }, [userId, pathname]);
+
   const qc = useQueryClient();
   const pending = items.some((i) => !(i.error && i.attempts >= 3));
 

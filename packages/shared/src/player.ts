@@ -263,7 +263,8 @@ export function equipmentChecklist(s: Pick<PlayerState, 'items' | 'exercises'>):
       const key = v.trim().toLowerCase();
       if (key && key !== 'bodyweight' && key !== 'body only' && !seen.has(key)) {
         seen.add(key);
-        list.push(v.trim());
+        const t = v.trim();
+        list.push(t[0]!.toUpperCase() + t.slice(1));
       }
     }
   };
@@ -282,13 +283,18 @@ export function equipmentChecklist(s: Pick<PlayerState, 'items' | 'exercises'>):
   return main.length ? [{ label: 'Main', items: main }, ...groups] : groups;
 }
 
-/** When on the last step of a superset's last round: the next block's name and equipment. */
+/**
+ * The changeover before a superset: the next block's name and equipment. Shown
+ * on the last step of a superset's last round, and on a standalone rest that
+ * leads straight into a superset.
+ */
 export function nextBlockPreview(s: PlayerState): { label: string; items: string[] } | null {
   const step = currentStep(s);
-  if (!step?.superset) return null;
-  const last = step.superset.round === step.superset.rounds && step.superset.position === step.superset.size;
-  if (!last) return null;
-  const nextBlock = s.items.slice(step.blockIndex + 1).find((it) => it.kind === 'superset');
+  if (!step) return null;
+  const endOfSuperset = !!step.superset && step.superset.round === step.superset.rounds && step.superset.position === step.superset.size;
+  const standaloneRest = !step.superset && step.kind === 'rest';
+  if (!endOfSuperset && !standaloneRest) return null;
+  const nextBlock = s.items.slice(step.blockIndex + 1).find((it) => it.kind !== 'rest');
   if (!nextBlock || nextBlock.kind !== 'superset') return null;
   const [group] = equipmentChecklist({ items: [nextBlock], exercises: s.exercises });
   return { label: nextBlock.label || 'Superset', items: group?.items ?? [] };

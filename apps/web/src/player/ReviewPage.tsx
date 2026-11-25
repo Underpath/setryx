@@ -1,12 +1,12 @@
 import { useMemo, useState } from 'react';
 import { Navigate, useNavigate, useParams } from 'react-router';
-import { type PlayerState, type SetLog, type TargetSuggestion, adjustLog, elapsedMs, loggedSets, sessionUploadOf, stepsOf, targetSuggestions } from '@setryx/shared';
+import { type PlayerState, type SetLog, type TargetSuggestion, adjustLog, elapsedMs, loggedSets, stepsOf, targetSuggestions } from '@setryx/shared';
 import { useMe } from '../session.ts';
 import { Sheet, useToast } from '../components/ui.tsx';
 import { useAllowNextNavigation } from '../components/backGuard.tsx';
 import { duration } from '../util.ts';
-import { enqueue, flushOutbox } from '../sync/outbox.ts';
-import { getFinished, removeFinished, updateFinished } from './storage.ts';
+import { flushOutbox, saveFinished } from '../sync/outbox.ts';
+import { getFinished, loadTicks, removeFinished, saveTicks, updateFinished } from './storage.ts';
 
 /** /review/:sessionId — check the sets, pick target updates, save. */
 export function ReviewRoute() {
@@ -31,9 +31,15 @@ function Review({ initial }: { initial: PlayerState }) {
   const steps = stepsOf(state);
   const sets = loggedSets(state);
   const suggestions = useMemo(() => targetSuggestions(state), [state]);
-  const [chosen, setChosen] = useState<Record<string, boolean>>(() =>
-    Object.fromEntries(targetSuggestions(initial).map((s) => [s.itemId, s.consistent])),
+  const [chosen, setChosenState] = useState<Record<string, boolean>>(
+    () => loadTicks(initial.id) ?? Object.fromEntries(targetSuggestions(initial).map((s) => [s.itemId, s.consistent])),
   );
+  const setChosen = (update: Record<string, boolean> | ((c: Record<string, boolean>) => Record<string, boolean>)) =>
+    setChosenState((c) => {
+      const next = typeof update === 'function' ? update(c) : update;
+      saveTicks(initial.id, next);
+      return next;
+    });
   const volume = sets.reduce((t, l) => t + (l.actualReps ?? 0) * (l.actualWeight ?? 0), 0);
   const name = (exerciseId: string) => state.exercises[exerciseId]?.name ?? 'Exercise';
 
@@ -41,6 +47,9 @@ function Review({ initial }: { initial: PlayerState }) {
     const next = adjustLog(state, stepIndex, patch);
     setState(next);
     updateFinished(next); // keep edits if the app closes before saving
+    // Changing a set here is a strong hint the plan should change too: tick it.
+    const itemId = next.logs[stepIndex]?.itemId;
+    if (itemId) setChosen((c) => ({ ...c, [itemId]: targetSuggestions(next).some((x) => x.itemId === itemId) }));
   };
 
   // Group the sets by workout step, in the order they appear.
@@ -51,26 +60,16 @@ function Review({ initial }: { initial: PlayerState }) {
   }, [sets]);
 
   const picked = suggestions.filter((s) => chosen[s.itemId]);
+  const suggestionFor = (itemId: string) => suggestions.find((s) => s.itemId === itemId);
 
   const save = async () => {
-    const upload = sessionUploadOf(state);
-    enqueue(state.userId, { id: `session:${state.id}`, kind: 'session', sessionId: state.id, label: state.workoutName, body: upload });
-    if (picked.length && state.workoutId) {
-      enqueue(state.userId, {
-        id: `targets:${state.id}`,
-        kind: 'targets',
-        workoutId: state.workoutId,
-        label: state.workoutName,
-        body: {
-          updates: picked.map((s) => ({
-            itemId: s.itemId,
-            ...(s.kind === 'reps' ? { targetReps: s.suggested.reps } : { targetDurationS: s.suggested.durationS }),
-            targetWeight: s.suggested.weight,
-          })),
-        },
-      });
-    }
-    removeFinished(state.userId, state.id);
+    saveFinished(state, {
+      updates: picked.map((s) => ({
+        itemId: s.itemId,
+        ...(s.kind === 'reps' ? { targetReps: s.suggested.reps } : { targetDurationS: s.suggested.durationS }),
+        targetWeight: s.suggested.weight,
+      })),
+    });
     const r = await flushOutbox(state.userId);
     toast(r.offline ? 'Saved on this device. It uploads when the server is reachable.' : 'Session saved');
     allowNext();
@@ -131,6 +130,12 @@ function Review({ initial }: { initial: PlayerState }) {
                   )}
                 </div>
               ))}
+              {suggestionFor(itemId) && state.workoutId && (
+                <label className="inline-update">
+                  <input type="checkbox" checked={!!chosen[itemId]} onChange={(e) => setChosen({ ...chosen, [itemId]: e.target.checked })} />
+                  <span>Update the workout to <strong>{fmtTarget(suggestionFor(itemId)!.suggested)}</strong> next time</span>
+                </label>
+              )}
             </div>
           );
         })}
@@ -168,7 +173,7 @@ function Suggestion({ s, name, checked, onChange }: { s: TargetSuggestion; name:
           <br />
           You did {perRound} {s.kind === 'reps' ? 'reps' : 's'}
           {weights.length > 1 ? ` at ${weights.join(', ')} kg` : ''}
-          {!s.consistent ? '. Not every round matched, so this isn’t ticked by default.' : '.'}
+          {!s.consistent ? '. Not every round matched.' : '.'}
         </span>
       </label>
     </li>

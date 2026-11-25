@@ -77,7 +77,17 @@ export function updateFinished(state: PlayerState): void {
   announce();
 }
 
+/** Which target updates are ticked on the review, so a reload keeps them. */
+const ticksKey = (id: string) => `setryx.review.ticks.${id}`;
+export function loadTicks(id: string): Record<string, boolean> | null {
+  return read<Record<string, boolean>>(ticksKey(id));
+}
+export function saveTicks(id: string, ticks: Record<string, boolean>): void {
+  write(ticksKey(id), ticks);
+}
+
 export function removeFinished(userId: string, id: string): void {
+  write(ticksKey(id), null);
   write(finishedKey(userId), loadFinished(userId).filter((s) => s.id !== id));
   announce();
 }

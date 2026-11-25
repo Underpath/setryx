@@ -243,8 +243,22 @@ textarea.input { resize: vertical; min-height: 88px; line-height: 1.45; }
 .wake { display: inline-flex; align-items: center; gap: 6px; font-size: .75rem; font-weight: 700; padding: 6px 10px; border-radius: 999px; border: 1.5px solid currentColor; color: inherit; white-space: nowrap; }
 .wake svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 2.2; }
 .wake-off { opacity: .7; border-style: dashed; }
-.progress { margin: 12px 16px 0; height: 4px; border-radius: 2px; background: rgba(255,255,255,.22); overflow: hidden; }
+.progress { margin: 12px 16px 0; display: flex; gap: 8px; }
+.progress .seg { position: relative; flex-basis: 0; min-width: 6px; height: 5px; border-radius: 3px; background: rgba(255,255,255,.22); overflow: hidden; }
+.progress .seg-superset { height: 9px; margin-top: -2px; border-radius: 2px; box-shadow: inset 0 0 0 1.5px rgba(255,255,255,.45); }
 .progress i { display: block; height: 100%; background: currentColor; transition: width .3s; }
+/* Round boundaries inside a superset */
+.progress .seg b { position: absolute; top: 0; bottom: 0; width: 3px; margin-left: -1.5px; background: rgba(0,0,0,.6); }
+
+/* Changeover: the rest before a new superset. Striped like floor tape, with the gear list up front. */
+.player.changeover .field-fill { background: repeating-linear-gradient(-45deg, var(--blue) 0 26px, #1A43B8 26px 52px); }
+.player.changeover.final .field-fill { background: repeating-linear-gradient(-45deg, var(--purple) 0 26px, #5E27B8 26px 52px); }
+.player.changeover .big { font-size: calc(min(22vh, 34vw) * var(--fit)); margin-top: 10px; }
+.changeover-card { display: grid; gap: 12px; margin-top: 6px; max-width: 34rem; width: 100%; }
+.gear { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; }
+.gear li { font: 700 clamp(1.15rem, 4.4vw, 1.6rem)/1.1 var(--display); padding: 9px 14px; border-radius: 10px; background: var(--chalk); color: var(--ink); }
+.gear-none { font: 700 1.4rem/1.1 var(--display); }
+.changeover-first { font-size: 1rem; line-height: 1.35; }
 
 .tap-area { flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: flex-start; padding: 0 20px; text-align: left; width: 100%; color: inherit; min-height: 0; }
 .ex-name { font: 700 clamp(1.8rem, 6vw, 2.6rem)/1 var(--display); max-width: 18ch; }
@@ -348,8 +362,6 @@ textarea.input { resize: vertical; min-height: 88px; line-height: 1.45; }
 .cue:first-child { padding-left: 0; border-left: 0; }
 .cue small { font-size: .78rem; font-weight: 700; opacity: .85; }
 .cue b { font: 700 1.6rem/1 var(--display); letter-spacing: .02em; color: inherit; }
-.review-banner { background: var(--blue); }
-.review-banner .btn { color: var(--blue); }
 .outbox-notice p { display: grid; gap: 8px; }
 .outbox-failed { display: block; }
 .link-btn { text-decoration: underline; font-weight: 700; color: inherit; padding: 0; }
@@ -361,6 +373,8 @@ textarea.input { resize: vertical; min-height: 88px; line-height: 1.45; }
 .review-set > .muted { width: 64px; }
 .mini-stepper { display: inline-flex; align-items: center; border: 1.5px solid var(--rule); border-radius: 999px; padding: 2px; }
 .mini-stepper.changed { border-color: var(--purple); }
+.inline-update { display: flex; align-items: flex-start; gap: 10px; margin-top: 8px; padding: 10px 12px; border-radius: 12px; border: 1.5px solid var(--purple); font-size: .9rem; line-height: 1.35; cursor: pointer; }
+.inline-update input { width: 20px; height: 20px; margin: 0; flex: none; accent-color: var(--purple); }
 .mini-stepper button { width: 36px; height: 36px; border-radius: 999px; font-size: 1.2rem; font-weight: 700; }
 .mini-stepper input { width: 3.4em; text-align: right; border: 0; background: transparent; font: 700 1.2rem/1 var(--display); color: var(--fg); padding: 0 2px; }
 .mini-stepper .unit { font-size: .75rem; color: var(--muted); margin-right: 4px; min-width: 2.2em; }

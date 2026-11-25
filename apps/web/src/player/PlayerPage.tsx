@@ -1,4 +1,4 @@
-import { type CSSProperties, useEffect, useMemo, useState } from 'react';
+import { type CSSProperties, type ReactNode, useEffect, useMemo, useState } from 'react';
 import { Link, Navigate, useNavigate, useParams } from 'react-router';
 import {
   type FlatStep,
@@ -150,7 +150,9 @@ function Player({ user, initial }: { user: PublicUser; initial: PlayerState }) {
   const log = correctableLog(state);
   const preview = nextBlockPreview(state);
 
-  const phaseClass = step.kind === 'rest' ? (final ? 'final' : 'rest') : timed ? (final ? 'final timed' : 'timed') : 'work';
+  // A rest that leads into a new superset: time to set up different equipment.
+  const changeover = step.kind === 'rest' && preview ? preview : null;
+  const phaseClass = (step.kind === 'rest' ? (final ? 'final' : 'rest') : timed ? (final ? 'final timed' : 'timed') : 'work') + (changeover ? ' changeover' : '');
   const fillPct = timed && total > 0 ? Math.max(0, Math.min(100, (left / total) * 100)) : 0;
   const nextLabel = step.kind === 'rest' ? 'Skip rest' : 'Log set';
   const tapToLog = settings.tapToLog;
@@ -163,7 +165,9 @@ function Player({ user, initial }: { user: PublicUser; initial: PlayerState }) {
     step.kind === 'rest'
       ? final
         ? 'Get ready'
-        : (step.label ?? 'Rest')
+        : changeover
+          ? `Set up ${changeover.label}`
+          : (step.label ?? 'Rest')
       : (ex(step)?.name ?? 'Exercise');
 
   const mainContent = (
@@ -188,6 +192,8 @@ function Player({ user, initial }: { user: PublicUser; initial: PlayerState }) {
           )}
           {tapToLog && settings.showTapHint && !state.paused && <span className="tap-hint">Tap anywhere to {step.targetType === 'timed' ? 'finish early' : 'log the set'}</span>}
         </>
+      ) : changeover ? (
+        <Changeover preview={changeover} first={nextUp ? <NextSummary step={nextUp} name={ex(nextUp)?.name} /> : null} />
       ) : (
         <NextLine step={nextUp} name={ex(nextUp)?.name} big={final} />
       )}
@@ -266,7 +272,13 @@ function Player({ user, initial }: { user: PublicUser; initial: PlayerState }) {
 
   const progress = (
     <div className="progress" role="progressbar" aria-label="Workout progress" aria-valuemin={0} aria-valuemax={steps.length} aria-valuenow={state.index}>
-      <i style={{ width: `${(state.index / steps.length) * 100}%` }} />
+      {progressSegments(steps).map((seg) => (
+        <span key={seg.start} className={seg.rounds ? 'seg seg-superset' : 'seg'} style={{ flexGrow: seg.count }}>
+          <i style={{ width: `${Math.max(0, Math.min(1, (state.index - seg.start) / seg.count)) * 100}%` }} />
+          {seg.rounds > 1 &&
+            Array.from({ length: seg.rounds - 1 }, (_, k) => <b key={k} style={{ left: `${((k + 1) / seg.rounds) * 100}%` }} />)}
+        </span>
+      ))}
     </div>
   );
 
@@ -295,7 +307,7 @@ function Player({ user, initial }: { user: PublicUser; initial: PlayerState }) {
             <RoundPanel state={state} />
             {logged}
             {step.kind === 'exercise' && <CuesBlock step={step} exercise={ex(step)} compact />}
-            {preview && <Preview preview={preview} />}
+            {preview && !changeover && <Preview preview={preview} />}
             {controls}
           </aside>
         </>
@@ -305,7 +317,7 @@ function Player({ user, initial }: { user: PublicUser; initial: PlayerState }) {
           {progress}
           {tapArea}
           <div className="p-bottom">
-            {preview && <Preview preview={preview} />}
+            {preview && !changeover && <Preview preview={preview} />}
             {logged}
             {!logged && step.kind === 'exercise' && (
               <div className="next">
@@ -448,6 +460,37 @@ function Cue({ label, value }: { label: string; value: string }) {
       <small>{label}</small>
       <b>{value}</b>
     </span>
+  );
+}
+
+/**
+ * The progress bar in pieces: each superset is its own piece with a tick per
+ * round, and runs of plain steps between them share one.
+ */
+function progressSegments(steps: FlatStep[]): { start: number; count: number; rounds: number }[] {
+  const out: { start: number; count: number; rounds: number; key: string }[] = [];
+  steps.forEach((st, i) => {
+    const key = st.superset ? `s${st.blockIndex}` : 'plain';
+    const last = out[out.length - 1];
+    if (last && last.key === key) last.count++;
+    else out.push({ start: i, count: 1, rounds: st.superset?.rounds ?? 0, key });
+  });
+  return out;
+}
+
+/** The changeover rest: the next superset's equipment, big enough to read from across the room. */
+function Changeover({ preview, first }: { preview: { label: string; items: string[] }; first: ReactNode }) {
+  return (
+    <div className="changeover-card">
+      {preview.items.length ? (
+        <ul className="gear">
+          {preview.items.map((it) => <li key={it}>{it}</li>)}
+        </ul>
+      ) : (
+        <p className="gear-none">No equipment needed</p>
+      )}
+      {first && <p className="changeover-first">Starts with {first}</p>}
+    </div>
   );
 }
 

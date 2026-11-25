@@ -123,6 +123,16 @@ test('next-block preview shows on the last step of the last round', () => {
   assert.equal(nextBlockPreview(s)?.label, 'Core');
 });
 
+test('next-block preview also shows on a standalone rest before a superset', () => {
+  const withRest: WorkoutItem[] = [items[0]!.kind === 'superset' ? { ...items[0]!, items: [items[0]!.items[0]!] } : items[0]!, { kind: 'rest', id: 'gap', durationS: 60, label: null }, items[1]!];
+  let s = start(createPlayer({ id: 's', userId: 'u', workoutId: 'w', workoutName: 'Push', icon: '', items: withRest, exercises, now: T0 - 5000 }), T0);
+  s = next(s, T0).state; // press round 1 -> press round 2
+  assert.equal(nextBlockPreview(s)?.label, 'Core', 'last step of the last round');
+  s = next(s, T0).state; // -> the standalone rest
+  assert.equal(currentStep(s)!.id, 'gap');
+  assert.equal(nextBlockPreview(s)?.label, 'Core');
+});
+
 test('target suggestions: only changed steps, last round wins, consistency flags the default', async () => {
   const { targetSuggestions, sessionUploadOf } = await import('../src/player.ts');
   let s = fresh();

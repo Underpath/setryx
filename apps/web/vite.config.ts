@@ -29,6 +29,10 @@ export default defineConfig({
         ],
       },
       workbox: {
+        // Take over as soon as a new version is installed; otherwise it waits
+        // until every setryx tab is closed, which on a phone can be days.
+        skipWaiting: true,
+        clientsClaim: true,
         globPatterns: ['**/*.{js,css,html,svg,png,woff,woff2}'],
         navigateFallback: '/index.html',
         navigateFallbackDenylist: [/^\/api\//],
