@@ -11,6 +11,7 @@ import { WorkoutsPage } from './pages/WorkoutsPage.tsx';
 import { LibraryPage } from './pages/LibraryPage.tsx';
 import { WorkoutEditorPage } from './pages/WorkoutEditorPage.tsx';
 import { ImportPage } from './pages/ImportPage.tsx';
+import { PlayerRoute } from './player/PlayerPage.tsx';
 
 const PUBLIC_PATHS = ['/login', '/signup', '/invite/'];
 
@@ -71,6 +72,8 @@ export const router = createBrowserRouter([
       { path: '/workouts/new', element: <WorkoutEditorPage /> },
       { path: '/workouts/import', element: <ImportPage /> },
       { path: '/workouts/:id', element: <WorkoutEditorPage /> },
+      { path: '/play', element: <PlayerRoute /> },
+      { path: '/play/:workoutId', element: <PlayerRoute /> },
       {
         element: <SignedIn />,
         children: [

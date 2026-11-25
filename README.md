@@ -2,7 +2,7 @@
 
 A self-hosted workout tracker for one household or a group of friends. It runs as a single Docker container serving plain HTTP. If you want HTTPS, put your own reverse proxy in front.
 
-Status: early development. Accounts, the exercise library, workout building and routine import work; running workouts comes next.
+Status: early development. Accounts, the exercise library, workout building, routine import and the workout player work; reviewing sessions and history come next.
 
 ## Run it
 

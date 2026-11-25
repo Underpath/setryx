@@ -15,16 +15,12 @@ import { ExercisePickerSheet } from '../components/exercises.tsx';
 import { ExerciseStepSheet, RestStepSheet, SupersetSheet } from '../components/stepSheets.tsx';
 import { move, useSortable } from '../components/sortable.ts';
 import { FormError, Icon, LeaveDialog, Sheet, useBeforeUnload, useToast } from '../components/ui.tsx';
+import { uid } from '../util.ts';
 
 type Draft = { name: string; icon: string; notes: string | null; items: WorkoutItem[] };
 const EMPTY: Draft = { name: '', icon: '', notes: null, items: [] };
 const ICONS = ['🫷', '🫸', '🤛', '🤜', '💪', '🏋️', '🦵', '🔥', '⚡', '🧘'];
 
-/** crypto.randomUUID needs HTTPS; getRandomValues works over plain HTTP too. */
-function uid(): string {
-  const b = crypto.getRandomValues(new Uint8Array(16));
-  return Array.from(b, (x) => x.toString(16).padStart(2, '0')).join('');
-}
 
 function firstGrapheme(s: string): string {
   const seg = new Intl.Segmenter(undefined, { granularity: 'grapheme' });
@@ -208,6 +204,7 @@ export function WorkoutEditorPage() {
           {draft.name || (isNew ? 'New workout' : 'Workout')}
           {dirty && <span className="dirty-dot" title="Unsaved changes" aria-label="Unsaved changes" />}
         </h1>
+        {!isNew && !dirty && <Link className="btn btn-quiet btn-sm" to={`/play/${id}`}>Start workout</Link>}
         <button className="btn btn-primary btn-sm" type="button" onClick={() => doSave()} disabled={save.isPending || (!dirty && !isNew)}>
           {save.isPending ? 'Saving…' : 'Save'}
         </button>

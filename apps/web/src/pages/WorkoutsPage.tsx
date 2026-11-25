@@ -24,7 +24,7 @@ export function WorkoutsPage({ user }: { user: PublicUser }) {
       {list.length > 0 && (
         <ul className="rows" style={{ marginTop: 8 }}>
           {list.map((w) => (
-            <li key={w.id}>
+            <li key={w.id} className="row-with-action">
               <Link className="row row-link" to={`/workouts/${w.id}`}>
                 <span className="emoji" aria-hidden>{w.icon || '•'}</span>
                 <span className="main">
@@ -34,6 +34,7 @@ export function WorkoutsPage({ user }: { user: PublicUser }) {
                   </span>
                 </span>
               </Link>
+              <Link className="btn btn-quiet btn-sm row-action" to={`/play/${w.id}`} aria-label={`Start ${w.name}`}>Start</Link>
             </li>
           ))}
         </ul>
