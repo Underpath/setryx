@@ -21,8 +21,9 @@ import {
 import { useMe } from '../session.ts';
 import { formatMinutes, useWorkout } from '../data.ts';
 import { FormError, Icon, Sheet, useToast } from '../components/ui.tsx';
+import { useAllowNextNavigation } from '../components/backGuard.tsx';
 import { clock, duration, uid, useMediaQuery } from '../util.ts';
-import { clearActive, loadActive } from './storage.ts';
+import { announce, clearActive, discardActive, loadActive } from './storage.ts';
 import { usePlayer } from './usePlayer.ts';
 import { useWakeLock } from './wakeLock.ts';
 
@@ -59,7 +60,7 @@ export function PlayerRoute() {
             className="btn btn-quiet btn-block"
             type="button"
             onClick={() => {
-              clearActive(user.id);
+              discardActive(user.id);
               setActive(null);
               setChoice('new');
             }}
@@ -181,8 +182,8 @@ function Player({ user, initial }: { user: PublicUser; initial: PlayerState }) {
           <span className="load">{step.targetWeight != null ? `${step.targetWeight} kg` : 'Bodyweight'}</span>
           {(step.tempo || step.rir) && (
             <span className="cues">
-              {step.tempo && <span><b>{step.tempo}</b>tempo</span>}
-              {step.rir && <span><b>{step.rir}</b>reps in reserve</span>}
+              {step.tempo && <Cue label="Tempo" value={step.tempo} />}
+              {step.rir && <Cue label="Reps in reserve" value={step.rir} />}
             </span>
           )}
           {tapToLog && settings.showTapHint && !state.paused && <span className="tap-hint">Tap anywhere to {step.targetType === 'timed' ? 'finish early' : 'log the set'}</span>}
@@ -342,13 +343,15 @@ function Player({ user, initial }: { user: PublicUser; initial: PlayerState }) {
 
 function DiscardButton({ state }: { state: PlayerState }) {
   const navigate = useNavigate();
+  const allowNext = useAllowNextNavigation();
   return (
     <button
       className="btn btn-quiet btn-block"
       type="button"
       onClick={() => {
-        clearActive(state.userId);
-        window.dispatchEvent(new Event('setryx:session'));
+        discardActive(state.userId, state.id);
+        announce();
+        allowNext();
         navigate('/', { replace: true });
       }}
     >
@@ -404,9 +407,9 @@ function NextLine({ step, name, big }: { step: FlatStep | null; name?: string; b
       <>
         <span className="load">{name}</span>
         <span className="cues">
-          <span><b>{step.targetType === 'reps' ? step.targetReps : `${step.targetDurationS} s`}</b>{step.targetType === 'reps' ? 'reps' : 'hold'}</span>
-          {step.targetWeight != null && <span><b>{step.targetWeight} kg</b>weight</span>}
-          {step.tempo && <span><b>{step.tempo}</b>tempo</span>}
+          <Cue label={step.targetType === 'reps' ? 'Reps' : 'Hold'} value={step.targetType === 'reps' ? String(step.targetReps) : `${step.targetDurationS} s`} />
+          {step.targetWeight != null && <Cue label="Weight" value={`${step.targetWeight} kg`} />}
+          {step.tempo && <Cue label="Tempo" value={step.tempo} />}
         </span>
       </>
     );
@@ -424,8 +427,8 @@ function CuesBlock({ step, exercise, compact }: { step: Extract<FlatStep, { kind
     <div className={`cues-block${compact ? ' compact' : ''}`}>
       {(step.tempo || step.rir) && compact && (
         <div className="cue-facts">
-          {step.tempo && <span><b>{step.tempo}</b>tempo</span>}
-          {step.rir && <span><b>{step.rir}</b>reps in reserve</span>}
+          {step.tempo && <Cue label="Tempo" value={step.tempo} />}
+          {step.rir && <Cue label="Reps in reserve" value={step.rir} />}
         </div>
       )}
       {step.notes && <p>{step.notes}</p>}
@@ -435,6 +438,16 @@ function CuesBlock({ step, exercise, compact }: { step: Extract<FlatStep, { kind
       )}
       {!compact && !step.notes && !equipment && !exercise?.instructions.length && <p className="muted">No form cues for this exercise.</p>}
     </div>
+  );
+}
+
+/** A labelled number: label on top, value below, with a divider before the next one. */
+function Cue({ label, value }: { label: string; value: string }) {
+  return (
+    <span className="cue">
+      <small>{label}</small>
+      <b>{value}</b>
+    </span>
   );
 }
 

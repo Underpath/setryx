@@ -72,10 +72,14 @@ export function Sheet({ title, onClose, children }: { title: string; onClose: ()
   const ref = useRef<HTMLDivElement>(null);
   const titleId = useId();
   // Phone back gesture / browser back closes the sheet instead of leaving the page.
-  useBackHandler(true, (nav) => {
-    nav.reset();
-    onClose();
-  });
+  useBackHandler(
+    true,
+    (nav) => {
+      nav.reset();
+      onClose();
+    },
+    { backOnly: true },
+  );
   useEffect(() => {
     const prev = document.activeElement as HTMLElement | null;
     // Focus the first field (or else the first action), not the close button in the header.
