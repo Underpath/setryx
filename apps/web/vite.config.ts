@@ -41,7 +41,7 @@ export default defineConfig({
         runtimeCaching: [
           {
             urlPattern: ({ url, request }) =>
-              request.method === 'GET' && /^\/api\/v1\/(auth\/me|setup|workouts|exercises)/.test(url.pathname),
+              request.method === 'GET' && /^\/api\/v1\/(auth\/me|setup|workouts|exercises|routines)/.test(url.pathname),
             handler: 'NetworkFirst',
             options: { cacheName: 'setryx-api', networkTimeoutSeconds: 4, expiration: { maxEntries: 200 } },
           },

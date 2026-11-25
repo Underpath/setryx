@@ -26,6 +26,9 @@ export type PlayerState = {
   workoutId: string;
   workoutName: string;
   icon: string;
+  /** The routine this session counts for, if any (absent in sessions saved before routines existed). */
+  routineId?: string | null;
+  routineEntryId?: string | null;
   items: WorkoutItem[];
   exercises: Record<string, SnapshotExercise>;
   phase: 'ready' | 'running' | 'finished';
@@ -82,6 +85,8 @@ export function createPlayer(init: {
   workoutId: string;
   workoutName: string;
   icon: string;
+  routineId?: string | null;
+  routineEntryId?: string | null;
   items: WorkoutItem[];
   exercises: Record<string, SnapshotExercise>;
   now: number;
@@ -312,6 +317,8 @@ export function sessionUploadOf(s: PlayerState): SessionUpload {
   const steps = stepsOf(s);
   return {
     workoutId: s.workoutId || null,
+    routineId: s.routineId ?? null,
+    routineEntryId: s.routineEntryId ?? null,
     workoutName: s.workoutName.slice(0, 80) || 'Workout',
     icon: s.icon.slice(0, 16),
     startedAt: s.startedAt ?? s.createdAt,

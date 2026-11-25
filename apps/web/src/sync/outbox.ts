@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useLocation } from 'react-router';
-import { type PlayerState, type SessionUpload, type TargetUpdates, sessionUploadOf } from '@setryx/shared';
+import { type PlayerState, type RoutineRun, type SessionUpload, type TargetUpdates, sessionUploadOf } from '@setryx/shared';
 import { api, ApiRequestError } from '../api.ts';
 import { loadFinished, removeFinished } from '../player/storage.ts';
 
@@ -39,6 +39,15 @@ function writeOutbox(userId: string, items: OutboxItem[]): void {
 export function enqueue(userId: string, item: NewOutboxItem): void {
   const items = readOutbox(userId).filter((i) => i.id !== item.id);
   writeOutbox(userId, [...items, { ...item, attempts: 0 } as OutboxItem]);
+}
+
+/** Routine sessions saved on this device but not on the server yet: they already count. */
+export function pendingRuns(items: OutboxItem[]): (RoutineRun & { routineId: string })[] {
+  return items.flatMap((i) =>
+    i.kind === 'session' && i.body.routineId && i.body.routineEntryId
+      ? [{ routineId: i.body.routineId, entryId: i.body.routineEntryId, startedAt: new Date(i.body.startedAt).toISOString() }]
+      : [],
+  );
 }
 
 /** Queues a finished session (and any target updates) for the server and takes it off the review list. */
@@ -135,6 +144,7 @@ export function SyncRunner({ userId }: { userId: string }) {
       const r = await flushOutbox(userId);
       if (r.sent.length) {
         void qc.invalidateQueries({ queryKey: ['sessions'] });
+        void qc.invalidateQueries({ queryKey: ['routines'] });
         for (const s of r.sent) {
           if (s.kind === 'targets') {
             void qc.invalidateQueries({ queryKey: ['workout', s.workoutId] });

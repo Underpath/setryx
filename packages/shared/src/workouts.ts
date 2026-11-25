@@ -186,6 +186,9 @@ export const sessionStatusSchema = z.enum(['completed', 'ended_early']);
 /** What a device uploads once a session is reviewed. Times are epoch milliseconds. */
 export const sessionUploadSchema = z.object({
   workoutId: z.string().max(64).nullable(),
+  // Set when the session was done as part of a routine.
+  routineId: z.string().max(64).nullable().default(null),
+  routineEntryId: z.string().max(64).nullable().default(null),
   workoutName: z.string().trim().min(1).max(80),
   icon: z.string().max(16).default(''),
   startedAt: z.number().int().min(0),
@@ -203,6 +206,8 @@ export type SessionUpload = z.input<typeof sessionUploadSchema>;
 export type SessionSummary = {
   id: string;
   workoutId: string | null;
+  routineId: string | null;
+  routineEntryId: string | null;
   workoutName: string;
   icon: string;
   startedAt: string;

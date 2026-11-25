@@ -3,6 +3,44 @@ import type { PublicUser } from '@setryx/shared';
 import { TopBar } from '../components/Shell.tsx';
 import { FormError } from '../components/ui.tsx';
 import { formatMinutes, useWorkouts } from '../data.ts';
+import { MODE_LABEL, useRoutineStatuses } from '../components/routines.tsx';
+
+function describeStatus(s: ReturnType<typeof useRoutineStatuses>['list'][number]): string {
+  const parts = [MODE_LABEL[s.routine.mode], `${s.routine.entries.length} workout${s.routine.entries.length === 1 ? '' : 's'}`];
+  if (!s.routine.active) parts.push('paused');
+  else if (s.status.kind === 'next') parts.push(`next: ${s.status.entry.workoutName}`);
+  else if (s.status.kind === 'complete') parts.push('complete');
+  return parts.join(', ');
+}
+
+function RoutinesSection({ user, hasWorkouts }: { user: PublicUser; hasWorkouts: boolean }) {
+  const { query, list } = useRoutineStatuses(user.id);
+  if (!hasWorkouts && !list.length) return null;
+  return (
+    <section className="section">
+      <div className="section-head">
+        <h2 className="h3">Routines</h2>
+        <Link className="btn btn-quiet btn-sm" to="/routines/new">New routine</Link>
+      </div>
+      <FormError error={query.error} />
+      {query.isSuccess && list.length === 0 && (
+        <p className="muted small">Group workouts into a routine, like Push A, Pull A, Push B, Pull B, and Today shows which one is next.</p>
+      )}
+      <ul className="rows">
+        {list.map((s) => (
+          <li key={s.routine.id}>
+            <Link className={`row row-link${s.routine.active ? '' : ' paused'}`} to={`/routines/${s.routine.id}`}>
+              <span className="main">
+                <span className="name">{s.routine.name}</span>
+                <span className="meta">{describeStatus(s)}</span>
+              </span>
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
 
 export function WorkoutsPage({ user }: { user: PublicUser }) {
   const workouts = useWorkouts();
@@ -39,6 +77,7 @@ export function WorkoutsPage({ user }: { user: PublicUser }) {
           ))}
         </ul>
       )}
+      <RoutinesSection user={user} hasWorkouts={list.length > 0} />
       <section className="section">
         <h2 className="h3">Move your data</h2>
         <ul className="rows">
@@ -47,7 +86,7 @@ export function WorkoutsPage({ user }: { user: PublicUser }) {
             <Link className="btn btn-quiet btn-sm" to="/workouts/import">Import</Link>
           </li>
           <li className="row">
-            <div className="main"><div className="name">Export everything</div><div className="meta">Your workouts and your own exercises, as a JSON file.</div></div>
+            <div className="main"><div className="name">Export everything</div><div className="meta">Your workouts, routines and your own exercises, as a JSON file.</div></div>
             <a className="btn btn-quiet btn-sm" href="/api/v1/export" download>Export</a>
           </li>
         </ul>

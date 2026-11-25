@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router';
 import { type PlayerState, type PublicUser, stepsOf } from '@setryx/shared';
 import { TopBar } from '../components/Shell.tsx';
-import { formatMinutes, useWorkouts } from '../data.ts';
+import { formatMinutes, useRestartRoutine, useWorkouts } from '../data.ts';
+import { UpNextCard, useRoutineStatuses } from '../components/routines.tsx';
 import { SESSION_EVENT, loadActive } from '../player/storage.ts';
 import { dropFromOutbox, useOutbox } from '../sync/outbox.ts';
 
@@ -98,17 +99,39 @@ function ResumeBanner({ session }: { session: PlayerState }) {
   );
 }
 
+/** One card per active routine: what's due now. */
+function UpNext({ user }: { user: PublicUser }) {
+  const { list } = useRoutineStatuses(user.id);
+  const restart = useRestartRoutine();
+  const active = list.filter((s) => s.routine.active && s.status.kind !== 'empty');
+  if (!active.length) return null;
+  return (
+    <section className="section upnext-list" aria-label="Up next">
+      {active.map((item) => (
+        <UpNextCard
+          key={item.routine.id}
+          item={item}
+          restarting={restart.isPending && restart.variables === item.routine.id}
+          onRestart={() => restart.mutate(item.routine.id)}
+        />
+      ))}
+    </section>
+  );
+}
+
 export function TodayPage({ user }: { user: PublicUser }) {
   const first = user.displayName.split(' ')[0];
   const active = useActiveSession(user.id);
   const workouts = useWorkouts();
   const list = workouts.data ?? [];
+  const routines = useRoutineStatuses(user.id);
   return (
     <>
       <TopBar title="Today" user={user} />
       <HttpsNotice />
       {active && <ResumeBanner session={active} />}
       <OutboxBanner userId={user.id} />
+      <UpNext user={user} />
       {workouts.isSuccess && list.length === 0 ? (
         <section className="empty">
           <h2 className="h2">Welcome, {first}</h2>
@@ -136,7 +159,11 @@ export function TodayPage({ user }: { user: PublicUser }) {
                 </li>
               ))}
             </ul>
-            <p className="small muted" style={{ marginTop: 12 }}>Routines that suggest what’s next come in a later update.</p>
+            {routines.query.isSuccess && routines.list.length === 0 && (
+            <p className="small muted" style={{ marginTop: 12 }}>
+              Group workouts into a <Link to="/routines/new">routine</Link> and Today shows which one is next.
+            </p>
+            )}
           </section>
         )
       )}

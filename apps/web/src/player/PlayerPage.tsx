@@ -1,5 +1,5 @@
 import { type CSSProperties, type ReactNode, useEffect, useMemo, useState } from 'react';
-import { Link, Navigate, useNavigate, useParams } from 'react-router';
+import { Link, Navigate, useNavigate, useParams, useSearchParams } from 'react-router';
 import {
   type FlatStep,
   type PlayerState,
@@ -14,12 +14,14 @@ import {
   isTimed,
   loggedSets,
   nextBlockPreview,
+  routineContextFor,
   remainingMs,
   stepDurationMs,
   stepsOf,
 } from '@setryx/shared';
 import { useMe } from '../session.ts';
-import { formatMinutes, useWorkout } from '../data.ts';
+import { formatMinutes, useRoutines, useWorkout } from '../data.ts';
+import { pendingRuns, useOutbox } from '../sync/outbox.ts';
 import { FormError, Icon, Sheet, useToast } from '../components/ui.tsx';
 import { useAllowNextNavigation } from '../components/backGuard.tsx';
 import { clock, duration, uid, useMediaQuery } from '../util.ts';
@@ -77,13 +79,26 @@ export function PlayerRoute() {
 
 function NewSession({ user, workoutId }: { user: PublicUser; workoutId: string }) {
   const w = useWorkout(workoutId);
+  const [params] = useSearchParams();
+  const routines = useRoutines();
+  const outbox = useOutbox(user.id);
+  // Started from a routine's Up next, or else counted for a routine waiting on this workout.
+  const picked = params.get('routine') && params.get('entry') ? { routineId: params.get('routine')!, entryId: params.get('entry')! } : null;
+  const routinesSettled = !!picked || !routines.isPending;
   const initial = useMemo(() => {
-    if (!w.data) return null;
+    if (!w.data || !routinesSettled) return null;
+    const ctx = picked ?? routineContextFor(workoutId, routines.data ?? [], new Date(), pendingRuns(outbox));
     const exercises: Record<string, SnapshotExercise> = {};
     for (const [id, e] of Object.entries(w.data.exercises)) exercises[id] = { name: e.name, equipment: e.equipment, instructions: e.instructions };
     const { workout } = w.data;
-    return createPlayer({ id: uid(), userId: user.id, workoutId: workout.id, workoutName: workout.name, icon: workout.icon, items: workout.items, exercises, now: Date.now() });
-  }, [w.data, user.id]);
+    return createPlayer({
+      id: uid(), userId: user.id, workoutId: workout.id, workoutName: workout.name, icon: workout.icon,
+      routineId: ctx?.routineId ?? null, routineEntryId: ctx?.entryId ?? null,
+      items: workout.items, exercises, now: Date.now(),
+    });
+    // Built once: later refetches mustn't restart the session.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [!!w.data, routinesSettled, user.id]);
   if (w.isError) {
     return (
       <main className="editor">

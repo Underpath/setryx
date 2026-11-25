@@ -18,6 +18,7 @@ import { requireUser } from '../app.ts';
 import { tx } from '../db.ts';
 import { customExercisesOf, getExercisesByIds, insertCustomExercise, listAllVisible } from '../exercises.ts';
 import { HttpError, parse } from '../http.ts';
+import { listRoutines } from '../routines.ts';
 import { archiveWorkout, createWorkout, getWorkout, listWorkouts, reidItems, replaceWorkout } from '../workouts.ts';
 
 type IdParams = { Params: { id: string } };
@@ -167,6 +168,7 @@ export const workoutRoutes: FastifyPluginAsync = async (app) => {
       exercises: customExercisesOf(db, userId),
       libraryExercises: Object.values(used).filter((e) => !e.isCustom).map((e) => ({ id: e.id, name: e.name })),
       workouts,
+      routines: listRoutines(db, userId).map(({ runs: _runs, ...r }) => r),
     };
   });
 };

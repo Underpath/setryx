@@ -392,3 +392,59 @@ textarea.input { resize: vertical; min-height: 88px; line-height: 1.45; }
 .review-set { display: grid; grid-template-columns: repeat(2, minmax(0, max-content)); gap: 6px 10px; padding: 6px 0; }
 .review-set > .muted { grid-column: 1 / -1; width: auto; }
 .mini-stepper input { width: 2.6em; }
+
+/* ── Routines ── */
+/* Up next: one card per active routine; the strip below is the routine's sequence. */
+.upnext-list { display: grid; gap: 12px; margin-top: 16px; }
+.upnext { background: var(--raise); border-radius: 20px; padding: 14px 16px 16px; display: grid; gap: 8px; border: 1px solid var(--rule); }
+.upnext-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; font-size: .875rem; }
+.upnext-routine { font-weight: 700; color: var(--fg); text-decoration: none; }
+.upnext-routine:hover { color: var(--blue-text); }
+.upnext-mode { color: var(--muted); }
+.upnext-main { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.upnext-title { font: 800 clamp(1.9rem, 7vw, 2.5rem)/1 var(--display); letter-spacing: -.01em; min-width: 0; }
+.upnext-meta { font-size: .875rem; color: var(--muted); }
+.upnext-actions { display: flex; gap: 8px; }
+.upnext-missed { list-style: none; display: grid; gap: 6px; }
+.upnext-missed li { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: .9rem; padding: 8px 10px; border-radius: 12px; background: color-mix(in srgb, var(--purple) 12%, transparent); }
+
+/* Rotation: plates on a bar. Done = green, next = blue, to come = outlined. */
+.rot-strip { list-style: none; display: grid; grid-auto-flow: column; grid-auto-columns: minmax(58px, 1fr); gap: 10px; margin-top: 4px; overflow-x: auto; scrollbar-width: none; padding: 2px 0; }
+.rot-strip li { position: relative; display: flex; align-items: center; justify-content: center; gap: 4px; min-width: 0; font-size: .8rem; font-weight: 700; padding: 6px 4px; border-radius: 8px; border: 1.5px solid var(--rule); color: var(--muted); }
+.rot-strip li > .t { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* The bar between plates */
+.rot-strip li + li::before { content: ""; position: absolute; left: -11.5px; top: 50%; width: 10px; height: 3px; margin-top: -1.5px; background: var(--rule); }
+.rot-strip li.done { background: var(--green); border-color: var(--green); color: var(--chalk); }
+.rot-strip li.next { background: var(--blue); border-color: var(--blue); color: var(--chalk); box-shadow: 0 0 0 2px var(--raise), 0 0 0 3.5px var(--blue); }
+
+/* Week: seven plates, Monday first. */
+.week-strip { list-style: none; display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; margin-top: 4px; max-width: 360px; }
+.week-strip .day { aspect-ratio: 1; border-radius: 999px; display: grid; place-items: center; font: 700 .95rem/1 var(--display); color: var(--muted); border: 1.5px dashed var(--rule); }
+.week-strip .day.planned { border: 2px solid var(--steel); color: var(--fg); }
+.week-strip .day.done { background: var(--green); border-color: var(--green); color: var(--chalk); }
+.week-strip .day.missed { border-color: var(--purple); color: var(--purple-text); border-width: 2.5px; }
+.week-strip .day.today { box-shadow: 0 0 0 3px var(--bg), 0 0 0 5.5px var(--blue); }
+.week-strip .day.today.planned:not(.done) { background: var(--blue); border-color: var(--blue); color: var(--chalk); }
+
+/* Routine editor */
+.r-entries { list-style: none; }
+.r-entry { display: flex; align-items: center; gap: 6px; border-bottom: 1px solid var(--rule); min-height: 52px; }
+.r-entries > .r-entry:first-child { border-top: 1px solid var(--rule); }
+.r-entry.dragging { opacity: .6; }
+.r-pos { font: 800 1.2rem/1 var(--display); color: var(--muted); width: 1.6em; text-align: right; flex: none; }
+.r-name { flex: 1; font-weight: 700; min-width: 0; padding: 0 6px; }
+.r-name.gone, .wp-chip.gone { color: var(--muted); text-decoration: line-through; }
+.r-day { width: auto; min-height: 40px; padding: 4px 10px; }
+.week-plan { list-style: none; }
+.week-plan li { display: grid; grid-template-columns: 7.5rem 1fr; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--rule); }
+.week-plan li:first-child { border-top: 1px solid var(--rule); }
+.wp-day { font-weight: 700; }
+.week-plan li.free .wp-day { color: var(--muted); font-weight: 400; }
+.wp-list { display: flex; flex-wrap: wrap; gap: 6px; }
+.wp-chip { display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 0 4px 0 12px; border-radius: 999px; background: color-mix(in srgb, var(--blue) 14%, transparent); font-weight: 700; font-size: .9rem; }
+.wp-chip button { width: 30px; height: 30px; border-radius: 999px; font-size: 1.1rem; color: var(--muted); }
+.wp-chip button:hover { color: var(--fg); background: var(--rule); }
+.wp-add { min-height: 36px; padding: 0 12px; border-radius: 999px; border: 1.5px dashed var(--rule); color: var(--muted); font-weight: 700; font-size: .9rem; }
+.wp-add:hover { color: var(--blue-text); border-color: var(--blue); }
+@media (max-width: 480px) { .week-plan li { grid-template-columns: 1fr; gap: 6px; } }
+.row-link.paused .name { color: var(--muted); }

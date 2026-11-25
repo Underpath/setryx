@@ -3,7 +3,9 @@ import type {
   Exercise,
   ExerciseInput,
   ImportChoice,
+  Routine,
   RoutineImportPreview,
+  RoutineInput,
   SessionDetail,
   SessionSummary,
   WorkoutInput,
@@ -134,5 +136,45 @@ export function useDeleteSession() {
   return useMutation({
     mutationFn: (id: string) => api.del(`/sessions/${id}`),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['sessions'] }),
+  });
+}
+
+// ── Routines ──
+export function useRoutines() {
+  return useQuery({ queryKey: ['routines'], queryFn: async () => (await api.get<{ routines: Routine[] }>('/routines')).routines });
+}
+
+export function useRoutine(id: string | undefined) {
+  return useQuery({
+    queryKey: ['routine', id],
+    queryFn: async () => (await api.get<{ routine: Routine }>(`/routines/${id}`)).routine,
+    enabled: !!id,
+    staleTime: Infinity, // the editor owns this while open
+  });
+}
+
+function useRoutineMutation<V>(fn: (v: V) => Promise<{ routine: Routine }>) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: fn,
+    onSuccess: (data) => {
+      qc.setQueryData(['routine', data.routine.id], data.routine);
+      void qc.invalidateQueries({ queryKey: ['routines'] });
+    },
+  });
+}
+
+export const useSaveRoutine = () =>
+  useRoutineMutation(({ id, input }: { id?: string; input: RoutineInput }) =>
+    id ? api.put<{ routine: Routine }>(`/routines/${id}`, input) : api.post<{ routine: Routine }>('/routines', input),
+  );
+export const useSetRoutineActive = () => useRoutineMutation(({ id, active }: { id: string; active: boolean }) => api.patch<{ routine: Routine }>(`/routines/${id}`, { active }));
+export const useRestartRoutine = () => useRoutineMutation((id: string) => api.post<{ routine: Routine }>(`/routines/${id}/restart`));
+
+export function useDeleteRoutine() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.del(`/routines/${id}`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['routines'] }),
   });
 }

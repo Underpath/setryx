@@ -10,6 +10,8 @@ type SessionRow = {
   id: string;
   user_id: string;
   workout_id: string | null;
+  routine_id: string | null;
+  routine_entry_id: string | null;
   workout_name: string;
   icon: string;
   started_at: string;
@@ -37,15 +39,15 @@ export function upsertSession(db: DB, userId: string, id: string, s: Upload): bo
     const snapshot = JSON.stringify({ items: s.items, exercises: s.exercises });
     if (owner) {
       db.prepare(
-        `UPDATE sessions SET workout_id = ?, workout_name = ?, icon = ?, started_at = ?, ended_at = ?, duration_ms = ?,
+        `UPDATE sessions SET workout_id = ?, routine_id = ?, routine_entry_id = ?, workout_name = ?, icon = ?, started_at = ?, ended_at = ?, duration_ms = ?,
                 status = ?, notes = ?, snapshot = ?, updated_at = ? WHERE id = ?`,
-      ).run(s.workoutId, s.workoutName, s.icon, iso(s.startedAt), iso(s.endedAt), s.durationMs, s.status, s.notes, snapshot, ts, id);
+      ).run(s.workoutId, s.routineId, s.routineEntryId, s.workoutName, s.icon, iso(s.startedAt), iso(s.endedAt), s.durationMs, s.status, s.notes, snapshot, ts, id);
       db.prepare('DELETE FROM set_logs WHERE session_id = ?').run(id);
     } else {
       db.prepare(
-        `INSERT INTO sessions (id, user_id, workout_id, workout_name, icon, started_at, ended_at, duration_ms, status, notes, snapshot, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      ).run(id, userId, s.workoutId, s.workoutName, s.icon, iso(s.startedAt), iso(s.endedAt), s.durationMs, s.status, s.notes, snapshot, ts, ts);
+        `INSERT INTO sessions (id, user_id, workout_id, routine_id, routine_entry_id, workout_name, icon, started_at, ended_at, duration_ms, status, notes, snapshot, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ).run(id, userId, s.workoutId, s.routineId, s.routineEntryId, s.workoutName, s.icon, iso(s.startedAt), iso(s.endedAt), s.durationMs, s.status, s.notes, snapshot, ts, ts);
     }
     const ins = db.prepare(
       `INSERT INTO set_logs (session_id, step_index, item_id, exercise_id, round, planned_reps, actual_reps, planned_weight, actual_weight,
@@ -63,6 +65,8 @@ function toSummary(r: SessionRow): SessionSummary {
   return {
     id: r.id,
     workoutId: r.workout_id,
+    routineId: r.routine_id,
+    routineEntryId: r.routine_entry_id,
     workoutName: r.workout_name,
     icon: r.icon,
     startedAt: r.started_at,

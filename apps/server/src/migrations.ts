@@ -130,4 +130,34 @@ export const migrations: { version: number; sql: string }[] = [
       CREATE INDEX set_logs_exercise ON set_logs(exercise_id);
     `,
   },
+  {
+    version: 4,
+    sql: `
+      CREATE TABLE routines (
+        id          TEXT PRIMARY KEY,
+        user_id     TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        name        TEXT NOT NULL,
+        mode        TEXT NOT NULL CHECK (mode IN ('repeat', 'once', 'weekly')),
+        active      INTEGER NOT NULL DEFAULT 1,
+        started_at  TEXT NOT NULL,
+        created_at  TEXT NOT NULL,
+        updated_at  TEXT NOT NULL
+      );
+      CREATE INDEX routines_user ON routines(user_id);
+
+      -- Weekday: 0 = Monday … 6 = Sunday, weekly routines only.
+      CREATE TABLE routine_entries (
+        routine_id  TEXT NOT NULL REFERENCES routines(id) ON DELETE CASCADE,
+        id          TEXT NOT NULL,
+        workout_id  TEXT NOT NULL,
+        position    INTEGER NOT NULL,
+        weekday     INTEGER CHECK (weekday BETWEEN 0 AND 6),
+        PRIMARY KEY (routine_id, id)
+      );
+
+      ALTER TABLE sessions ADD COLUMN routine_id TEXT;
+      ALTER TABLE sessions ADD COLUMN routine_entry_id TEXT;
+      CREATE INDEX sessions_routine ON sessions(routine_id, started_at);
+    `,
+  },
 ];
