@@ -1,0 +1,105 @@
+import type { FastifyPluginAsync, FastifyRequest } from 'fastify';
+import {
+  adminCreateUserRequestSchema,
+  adminResetPasswordRequestSchema,
+  adminUpdateUserRequestSchema,
+  appSettingsSchema,
+  createInviteRequestSchema,
+} from '@setryx/shared';
+import { requireAdmin } from '../app.ts';
+import { tx } from '../db.ts';
+import { HttpError, parse } from '../http.ts';
+import { createInvite, deleteInvite, listInvites } from '../invites.ts';
+import { hashPassword } from '../passwords.ts';
+import { deleteUserSessions } from '../sessions.ts';
+import {
+  countActiveAdmins,
+  findUserById,
+  findUserByUsername,
+  getOpenSignup,
+  insertUser,
+  listUsers,
+  setOpenSignup,
+  setPassword,
+  toPublic,
+  updateUser,
+} from '../users.ts';
+
+type IdParams = { Params: { id: string } };
+
+function originOf(req: FastifyRequest): string {
+  return req.server.config.baseUrl ?? `${req.protocol}://${req.host}`;
+}
+
+export const adminRoutes: FastifyPluginAsync = async (app) => {
+  const { db } = app;
+  app.addHook('preHandler', async (req) => void requireAdmin(req));
+
+  // ── Users ──
+  app.get('/users', async () => ({ users: listUsers(db).map(toPublic) }));
+
+  app.post('/users', async (req, reply) => {
+    const body = parse(adminCreateUserRequestSchema, req.body);
+    const passwordHash = await hashPassword(body.password);
+    const user = tx(db, () => {
+      if (findUserByUsername(db, body.username)) {
+        throw new HttpError(409, 'username_taken', 'That username is taken.', { username: 'That username is taken.' });
+      }
+      return insertUser(db, { username: body.username, displayName: body.displayName, passwordHash, role: body.role });
+    });
+    return reply.status(201).send({ user: toPublic(user) });
+  });
+
+  app.patch<IdParams>('/users/:id', async (req) => {
+    const body = parse(adminUpdateUserRequestSchema, req.body);
+    const user = tx(db, () => {
+      const target = findUserById(db, req.params.id);
+      if (!target) throw new HttpError(404, 'not_found', 'No such user.');
+      const losesAdmin =
+        target.role === 'admin' && !target.disabled && (body.role === 'user' || body.disabled === true);
+      if (losesAdmin && countActiveAdmins(db) <= 1) {
+        throw new HttpError(409, 'last_admin', 'This is the only admin. Make someone else an admin first.');
+      }
+      if (target.id === req.user!.id && body.disabled) {
+        throw new HttpError(409, 'self_disable', 'You can’t turn off your own account.');
+      }
+      const updated = updateUser(db, target.id, body)!;
+      if (body.disabled) deleteUserSessions(db, target.id);
+      return updated;
+    });
+    return { user: toPublic(user) };
+  });
+
+  app.post<IdParams>('/users/:id/password', async (req, reply) => {
+    const body = parse(adminResetPasswordRequestSchema, req.body);
+    const target = findUserById(db, req.params.id);
+    if (!target) throw new HttpError(404, 'not_found', 'No such user.');
+    await setPassword(db, target.id, body.password);
+    // Their old sessions stop working; resetting your own keeps this device signed in.
+    deleteUserSessions(db, target.id, target.id === req.user!.id ? req.sessionToken ?? undefined : undefined);
+    return reply.status(204).send();
+  });
+
+  // ── Invites ──
+  app.get('/invites', async () => ({ invites: listInvites(db) }));
+
+  app.post('/invites', async (req, reply) => {
+    const body = parse(createInviteRequestSchema, req.body);
+    const { invite, token } = createInvite(db, req.user!.id, body.expiresInDays);
+    return reply.status(201).send({ invite, url: `${originOf(req)}/invite/${token}` });
+  });
+
+  app.delete<IdParams>('/invites/:id', async (req, reply) => {
+    if (!deleteInvite(db, req.params.id)) throw new HttpError(404, 'not_found', 'No open invite with that id.');
+    return reply.status(204).send();
+  });
+
+  // ── Server settings ──
+  app.get('/settings', async () => ({ openSignup: getOpenSignup(db) }));
+
+  app.patch('/settings', async (req) => {
+    const body = parse(appSettingsSchema, req.body);
+    setOpenSignup(db, body.openSignup);
+    return { openSignup: getOpenSignup(db) };
+  });
+};

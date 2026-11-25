@@ -1,0 +1,20 @@
+{
+  "name": "@setryx/server",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "node --watch --env-file-if-exists=../../stack.env src/main.ts",
+    "start": "node src/main.ts",
+    "test": "node --test --test-reporter=spec test/",
+    "cli": "node src/cli.ts"
+  },
+  "dependencies": {
+    "@fastify/cookie": "^11.0.0",
+    "@fastify/rate-limit": "^11.0.0",
+    "@fastify/static": "^10.0.0",
+    "@setryx/shared": "*",
+    "fastify": "^5.6.0",
+    "zod": "^4.1.0"
+  }
+}

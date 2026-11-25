@@ -1,0 +1,10 @@
+# Dependencies and build output
+node_modules/
+dist/
+
+# Local runtime data and secrets
+data/
+stack.env
+
+# OS noise
+.DS_Store

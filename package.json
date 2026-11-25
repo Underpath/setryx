@@ -1,0 +1,24 @@
+{
+  "name": "setryx",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "engines": {
+    "node": ">=24.7"
+  },
+  "scripts": {
+    "dev": "npm run dev --workspace @setryx/server & npm run dev --workspace @setryx/web",
+    "build": "npm run build --workspace @setryx/web",
+    "start": "npm start --workspace @setryx/server",
+    "test": "npm test --workspace @setryx/shared && npm test --workspace @setryx/server",
+    "typecheck": "tsc -p packages/shared && tsc -p apps/server && tsc -p apps/web"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.0",
+    "@types/node": "^24.0.0"
+  }
+}

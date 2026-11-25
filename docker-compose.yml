@@ -1,0 +1,25 @@
+services:
+  setryx:
+    build: .
+    image: setryx:latest
+    container_name: setryx
+    restart: unless-stopped
+    ports:
+      - "38471:38471"
+    # Secrets live only in stack.env (git-ignored). Copy stack.env.example to start.
+    env_file:
+      - path: stack.env
+        required: false
+    environment:
+      PORT: "38471"
+      # Set to true when a reverse proxy sits in front, so HTTPS and client IPs are detected.
+      TRUST_PROXY: "false"
+      # auto = Secure cookies when the proxy reports HTTPS.
+      COOKIE_SECURE: auto
+      # Public address, used in invite links. Optional.
+      # BASE_URL: https://setryx.example.com
+    volumes:
+      - setryx-data:/data
+
+volumes:
+  setryx-data:
