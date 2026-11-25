@@ -195,3 +195,11 @@ test('serves the web app: SPA routes get index.html, missing assets get 404', as
   const api404 = await web.inject({ method: 'GET', url: '/api/v1/nope' });
   assert.equal(api404.json().error, 'not_found');
 });
+
+test('the Docker image includes every folder the server reads at runtime', async () => {
+  const { readFileSync } = await import('node:fs');
+  const dockerfile = readFileSync(new URL('../../../Dockerfile', import.meta.url), 'utf8');
+  for (const dir of ['apps/server/src', 'apps/server/seed', 'apps/web/dist', 'packages/shared']) {
+    assert.match(dockerfile, new RegExp(`COPY --from=build /app/${dir} `), `Dockerfile must copy ${dir}`);
+  }
+});

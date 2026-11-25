@@ -22,6 +22,7 @@ COPY --from=build /app/node_modules node_modules
 COPY --from=build /app/packages/shared packages/shared
 COPY --from=build /app/apps/server/package.json apps/server/
 COPY --from=build /app/apps/server/src apps/server/src
+COPY --from=build /app/apps/server/seed apps/server/seed
 COPY --from=build /app/apps/web/dist apps/web/dist
 # Admin helpers: docker exec -it setryx reset-password <username>
 RUN printf '#!/bin/sh\nexec node /app/apps/server/src/cli.ts reset-password "$@"\n' > /usr/local/bin/reset-password \
