@@ -1,15 +1,24 @@
-import { Navigate, Route, Routes, useLocation } from 'react-router';
+import type { ComponentType } from 'react';
+import { Navigate, Outlet, createBrowserRouter, useLocation } from 'react-router';
+import type { PublicUser } from '@setryx/shared';
 import { useMe, useSetupStatus, useThemeFromSettings } from './session.ts';
 import { Shell } from './components/Shell.tsx';
 import { LoginPage, SetupPage, SignupPage } from './pages/AuthPages.tsx';
 import { ComingSoonPage, TodayPage } from './pages/TodayPage.tsx';
 import { SettingsPage } from './pages/SettingsPage.tsx';
 import { AdminPage } from './pages/AdminPage.tsx';
+import { WorkoutsPage } from './pages/WorkoutsPage.tsx';
+import { LibraryPage } from './pages/LibraryPage.tsx';
+import { WorkoutEditorPage } from './pages/WorkoutEditorPage.tsx';
+import { ImportPage } from './pages/ImportPage.tsx';
 
-export function App() {
+const PUBLIC_PATHS = ['/login', '/signup', '/invite/'];
+
+/** Loads setup state and the signed-in user, and sends people to the right place. */
+function Root() {
   const setup = useSetupStatus();
   const me = useMe();
-  const location = useLocation();
+  const { pathname } = useLocation();
   useThemeFromSettings(me.data);
 
   if (setup.isPending || me.isPending) return <div className="center-load">Loading…</div>;
@@ -23,41 +32,57 @@ export function App() {
       </div>
     );
   }
-
-  const needsSetup = setup.data.needsSetup;
-  const user = me.data;
-
-  if (needsSetup) {
-    return (
-      <Routes>
-        <Route path="/setup" element={<SetupPage />} />
-        <Route path="*" element={<Navigate to="/setup" replace />} />
-      </Routes>
-    );
-  }
-
-  if (!user) {
-    return (
-      <Routes>
-        <Route path="/login" element={<LoginPage />} />
-        <Route path="/signup" element={<SignupPage />} />
-        <Route path="/invite/:token" element={<SignupPage />} />
-        <Route path="*" element={<Navigate to="/login" replace state={{ from: location.pathname }} />} />
-      </Routes>
-    );
-  }
-
-  return (
-    <Routes>
-      <Route element={<Shell user={user} />}>
-        <Route index element={<TodayPage user={user} />} />
-        <Route path="workouts" element={<ComingSoonPage title="Workouts" user={user} text="Building workouts and importing your routines comes in the next update." />} />
-        <Route path="library" element={<ComingSoonPage title="Library" user={user} text="The exercise library, with about 870 exercises and your own custom ones, is on its way." />} />
-        <Route path="stats" element={<ComingSoonPage title="Stats" user={user} text="Charts and records appear once you’ve logged some workouts." />} />
-        <Route path="settings" element={<SettingsPage user={user} />} />
-        <Route path="settings/admin" element={<AdminPage user={user} />} />
-      </Route>
-      <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
-  );
+  if (setup.data.needsSetup) return pathname === '/setup' ? <SetupPage /> : <Navigate to="/setup" replace />;
+  const isPublic = PUBLIC_PATHS.some((p) => pathname.startsWith(p));
+  if (!me.data) return isPublic ? <Outlet /> : <Navigate to="/login" replace />;
+  if (isPublic || pathname === '/setup') return <Navigate to="/" replace />;
+  return <Outlet context={me.data} />;
 }
+
+function SignedIn() {
+  const me = useMe();
+  return <Shell user={me.data!} />;
+}
+
+/** Hands the signed-in user to pages that take it as a prop. */
+function withUser(Page: ComponentType<{ user: PublicUser }>) {
+  return function WithUser() {
+    const me = useMe();
+    return <Page user={me.data!} />;
+  };
+}
+
+const Today = withUser(TodayPage);
+const Settings = withUser(SettingsPage);
+const Admin = withUser(AdminPage);
+const Workouts = withUser(WorkoutsPage);
+const Library = withUser(LibraryPage);
+const Stats = withUser(({ user }) => <ComingSoonPage title="Stats" user={user} text="Charts and records appear once you’ve logged some workouts." />);
+
+export const router = createBrowserRouter([
+  {
+    element: <Root />,
+    children: [
+      { path: '/setup', element: <SetupPage /> },
+      { path: '/login', element: <LoginPage /> },
+      { path: '/signup', element: <SignupPage /> },
+      { path: '/invite/:token', element: <SignupPage /> },
+      // Full-screen pages without the tab bar
+      { path: '/workouts/new', element: <WorkoutEditorPage /> },
+      { path: '/workouts/import', element: <ImportPage /> },
+      { path: '/workouts/:id', element: <WorkoutEditorPage /> },
+      {
+        element: <SignedIn />,
+        children: [
+          { index: true, element: <Today /> },
+          { path: '/workouts', element: <Workouts /> },
+          { path: '/library', element: <Library /> },
+          { path: '/stats', element: <Stats /> },
+          { path: '/settings', element: <Settings /> },
+          { path: '/settings/admin', element: <Admin /> },
+        ],
+      },
+      { path: '*', element: <Navigate to="/" replace /> },
+    ],
+  },
+]);

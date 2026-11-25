@@ -45,8 +45,8 @@ export function TodayPage({ user }: { user: PublicUser }) {
       <section className="empty">
         <h2 className="h2">Welcome, {first}</h2>
         <p className="muted">
-          Your account is ready. Building workouts, importing your routines and running workouts arrive in the next updates. Until then
-          you can set up your preferences in Settings{user.role === 'admin' ? ', and add the people who’ll train here' : ''}.
+          You can build workouts and import your routines under Workouts. Running a workout, with timers and set logging, arrives in the
+          next update{user.role === 'admin' ? '. Meanwhile you can add the people who’ll train here in Settings' : ''}.
         </p>
       </section>
     </>

@@ -10,6 +10,10 @@ const paths = {
   back: <path d="M15 5l-7 7 7 7" />,
   close: <path d="M6 6l12 12M18 6L6 18" />,
   copy: <><rect x="9" y="9" width="11" height="11" rx="2" /><path d="M5 15V5a2 2 0 0 1 2-2h8" /></>,
+  grip: <><circle cx="9" cy="6" r="1" /><circle cx="15" cy="6" r="1" /><circle cx="9" cy="12" r="1" /><circle cx="15" cy="12" r="1" /><circle cx="9" cy="18" r="1" /><circle cx="15" cy="18" r="1" /></>,
+  search: <><circle cx="11" cy="11" r="7" /><path d="M20 20l-4-4" /></>,
+  plus: <path d="M12 5v14M5 12h14" />,
+  more: <><circle cx="5" cy="12" r="1" /><circle cx="12" cy="12" r="1" /><circle cx="19" cy="12" r="1" /></>,
 };
 export function Icon({ name, label }: { name: keyof typeof paths; label?: string }) {
   return (
@@ -68,7 +72,13 @@ export function Sheet({ title, onClose, children }: { title: string; onClose: ()
   const titleId = useId();
   useEffect(() => {
     const prev = document.activeElement as HTMLElement | null;
-    ref.current?.querySelector<HTMLElement>('input, button')?.focus();
+    // Focus the first field (or else the first action), not the close button in the header.
+    const body = ref.current;
+    const target =
+      body?.querySelector<HTMLElement>('[data-autofocus]') ??
+      body?.querySelector<HTMLElement>(':scope > :not(.sheet-head) input:not([type=checkbox]):not([type=hidden]), :scope > :not(.sheet-head) textarea, :scope > :not(.sheet-head) select, :scope > input, :scope > form input') ??
+      body?.querySelector<HTMLElement>(':scope > button, :scope > :not(.sheet-head) button');
+    target?.focus();
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
     document.addEventListener('keydown', onKey);
     return () => {
@@ -106,4 +116,43 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       <div aria-live="polite">{msg && <div className="toast">{msg}</div>}</div>
     </ToastContext.Provider>
   );
+}
+
+// ── Unsaved-changes dialog ──
+export function LeaveDialog({
+  message,
+  saveLabel,
+  saving,
+  onSave,
+  onDiscard,
+  onKeep,
+}: {
+  message: string;
+  saveLabel: string;
+  saving?: boolean;
+  onSave: () => void;
+  onDiscard: () => void;
+  onKeep: () => void;
+}) {
+  return (
+    <Sheet title="Save your changes?" onClose={onKeep}>
+      <p className="muted">{message}</p>
+      <button className="btn btn-primary btn-block" type="button" onClick={onSave} disabled={saving}>{saving ? 'Saving…' : saveLabel}</button>
+      <button className="btn btn-quiet btn-block" type="button" onClick={onDiscard}>Discard changes</button>
+      <button className="btn btn-block" type="button" onClick={onKeep}>Keep editing</button>
+    </Sheet>
+  );
+}
+
+/** Asks the browser to warn before closing or reloading the tab while there are unsaved changes. */
+export function useBeforeUnload(active: boolean) {
+  useEffect(() => {
+    if (!active) return;
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = '';
+    };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, [active]);
 }

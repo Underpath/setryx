@@ -2,7 +2,7 @@
 
 A self-hosted workout tracker for one household or a group of friends. It runs as a single Docker container serving plain HTTP. If you want HTTPS, put your own reverse proxy in front.
 
-Status: early development. Accounts, admin and invites work; workouts arrive next.
+Status: early development. Accounts, the exercise library, workout building and routine import work; running workouts comes next.
 
 ## Run it
 
@@ -14,6 +14,8 @@ docker compose up -d --build
 Open `http://<your-server>:38471`. The first account you create becomes the admin. Sign-up then closes. To add people, go to **Settings → People and invites**, then either create accounts yourself or send invite links.
 
 Data lives in the `setryx-data` volume (`/data` in the container): the SQLite database and the generated session secret.
+
+The exercise library comes from [free-exercise-db](https://github.com/yuhonas/free-exercise-db) (public domain).
 
 ### Configuration
 
