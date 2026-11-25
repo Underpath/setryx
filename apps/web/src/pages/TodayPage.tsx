@@ -3,7 +3,8 @@ import { Link } from 'react-router';
 import { type PlayerState, type PublicUser, stepsOf } from '@setryx/shared';
 import { TopBar } from '../components/Shell.tsx';
 import { formatMinutes, useWorkouts } from '../data.ts';
-import { SESSION_EVENT, loadActive } from '../player/storage.ts';
+import { SESSION_EVENT, loadActive, loadFinished } from '../player/storage.ts';
+import { dropFromOutbox, useOutbox } from '../sync/outbox.ts';
 
 const HTTPS_NOTICE_KEY = 'setryx.httpsNoticeDismissed';
 
@@ -39,18 +40,64 @@ function HttpsNotice() {
   );
 }
 
-function useActiveSession(userId: string): PlayerState | null {
-  const [active, setActive] = useState(() => loadActive(userId));
+function useLocalSessions(userId: string): { active: PlayerState | null; finished: PlayerState[] } {
+  const read = () => ({ active: loadActive(userId), finished: loadFinished(userId) });
+  const [state, setState] = useState(read);
   useEffect(() => {
-    const refresh = () => setActive(loadActive(userId));
+    const refresh = () => setState(read());
     window.addEventListener(SESSION_EVENT, refresh);
     window.addEventListener('storage', refresh);
     return () => {
       window.removeEventListener(SESSION_EVENT, refresh);
       window.removeEventListener('storage', refresh);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId]);
-  return active;
+  return state;
+}
+
+/** Finished on this device but not reviewed yet. */
+function ReviewBanners({ sessions }: { sessions: PlayerState[] }) {
+  return (
+    <>
+      {sessions.map((s) => (
+        <div className="resume-banner review-banner" key={s.id}>
+          <p>
+            <strong>Review {s.workoutName}</strong>
+            Finished {new Date(s.finishedAt ?? s.createdAt).toLocaleString(undefined, { weekday: 'short', hour: 'numeric', minute: '2-digit' })}. It isn’t saved to your history until you review it.
+          </p>
+          <Link className="btn" to={`/review/${s.id}`}>Review</Link>
+        </div>
+      ))}
+    </>
+  );
+}
+
+/** Saved on this device, waiting for the server. */
+function OutboxBanner({ userId }: { userId: string }) {
+  const items = useOutbox(userId);
+  if (!items.length) return null;
+  const failed = items.filter((i) => i.error && i.attempts >= 3);
+  const waiting = items.filter((i) => !(i.error && i.attempts >= 3) && i.kind === 'session').length;
+  return (
+    <div className="notice outbox-notice" role="status">
+      <p>
+        {waiting > 0 && (
+          <>
+            <strong>{waiting} session{waiting === 1 ? '' : 's'} waiting to upload</strong>
+            Saved on this device. They upload as soon as the server is reachable.
+          </>
+        )}
+        {failed.map((f) => (
+          <span key={f.id} className="outbox-failed">
+            <strong>Couldn’t save {f.kind === 'session' ? 'the session' : 'the target updates'} for {f.label}</strong>
+            {f.error}{' '}
+            <button className="link-btn" type="button" onClick={() => dropFromOutbox(userId, f.id)}>Remove it</button>
+          </span>
+        ))}
+      </p>
+    </div>
+  );
 }
 
 function ResumeBanner({ session }: { session: PlayerState }) {
@@ -70,7 +117,7 @@ function ResumeBanner({ session }: { session: PlayerState }) {
 
 export function TodayPage({ user }: { user: PublicUser }) {
   const first = user.displayName.split(' ')[0];
-  const active = useActiveSession(user.id);
+  const { active, finished } = useLocalSessions(user.id);
   const workouts = useWorkouts();
   const list = workouts.data ?? [];
   return (
@@ -78,6 +125,8 @@ export function TodayPage({ user }: { user: PublicUser }) {
       <TopBar title="Today" user={user} />
       <HttpsNotice />
       {active && <ResumeBanner session={active} />}
+      <ReviewBanners sessions={finished} />
+      <OutboxBanner userId={user.id} />
       {workouts.isSuccess && list.length === 0 ? (
         <section className="empty">
           <h2 className="h2">Welcome, {first}</h2>

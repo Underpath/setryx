@@ -23,7 +23,7 @@ import { formatMinutes, useWorkout } from '../data.ts';
 import { FormError, Icon, Sheet, useToast } from '../components/ui.tsx';
 import { useAllowNextNavigation } from '../components/backGuard.tsx';
 import { clock, duration, uid, useMediaQuery } from '../util.ts';
-import { announce, clearActive, discardActive, loadActive } from './storage.ts';
+import { addFinished, announce, clearActive, discardActive, loadActive } from './storage.ts';
 import { usePlayer } from './usePlayer.ts';
 import { useWakeLock } from './wakeLock.ts';
 
@@ -136,7 +136,7 @@ function Player({ user, initial }: { user: PublicUser; initial: PlayerState }) {
       />
     );
   }
-  if (state.phase === 'finished') return <DoneScreen state={state} />;
+  if (state.phase === 'finished') return <FinishedRedirect state={state} />;
 
   const steps = stepsOf(state);
   const step = currentStep(state)!;
@@ -539,21 +539,16 @@ function StartScreen({ state, onStart }: { state: PlayerState; onStart: () => vo
   );
 }
 
-function DoneScreen({ state }: { state: PlayerState }) {
-  const sets = loggedSets(state);
-  const volume = sets.reduce((t, l) => t + (l.actualReps ?? 0) * (l.actualWeight ?? 0), 0);
-  return (
-    <main className="editor done-screen">
-      <h1 className="h1">{state.workoutName} done</h1>
-      <div className="summary">
-        <div><b>{duration(elapsedMs(state, state.finishedAt ?? Date.now()))}</b>duration</div>
-        <div><b>{sets.length}</b>sets</div>
-        <div><b>{Math.round(volume).toLocaleString()}</b>kg moved</div>
-      </div>
-      <p className="muted" style={{ marginTop: 18, maxWidth: '56ch' }}>
-        This session is saved on this device. Reviewing it, updating your targets and adding it to your history arrive in the next update.
-      </p>
-      <Link className="btn btn-primary" to="/" style={{ marginTop: 20 }}>Back to Today</Link>
-    </main>
-  );
+/** Hands a finished session to the review screen (saved first, so a reload can't lose it). */
+function FinishedRedirect({ state }: { state: PlayerState }) {
+  const navigate = useNavigate();
+  const allowNext = useAllowNextNavigation();
+  useEffect(() => {
+    addFinished(state);
+    clearActive(state.userId);
+    announce();
+    allowNext();
+    navigate(`/review/${state.id}`, { replace: true });
+  }, [state, navigate, allowNext]);
+  return <div className="center-load">Saving…</div>;
 }

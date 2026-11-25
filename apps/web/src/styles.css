@@ -348,3 +348,31 @@ textarea.input { resize: vertical; min-height: 88px; line-height: 1.45; }
 .cue:first-child { padding-left: 0; border-left: 0; }
 .cue small { font-size: .78rem; font-weight: 700; opacity: .85; }
 .cue b { font: 700 1.6rem/1 var(--display); letter-spacing: .02em; color: inherit; }
+.review-banner { background: var(--blue); }
+.review-banner .btn { color: var(--blue); }
+.outbox-notice p { display: grid; gap: 8px; }
+.outbox-failed { display: block; }
+.link-btn { text-decoration: underline; font-weight: 700; color: inherit; padding: 0; }
+
+/* Review */
+.review-group { padding: 12px 0; border-bottom: 1px solid var(--rule); }
+.review-group > .name { font-weight: 700; margin-bottom: 6px; }
+.review-set { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 4px 0; }
+.review-set > .muted { width: 64px; }
+.mini-stepper { display: inline-flex; align-items: center; border: 1.5px solid var(--rule); border-radius: 999px; padding: 2px; }
+.mini-stepper.changed { border-color: var(--purple); }
+.mini-stepper button { width: 36px; height: 36px; border-radius: 999px; font-size: 1.2rem; font-weight: 700; }
+.mini-stepper input { width: 3.4em; text-align: right; border: 0; background: transparent; font: 700 1.2rem/1 var(--display); color: var(--fg); padding: 0 2px; }
+.mini-stepper .unit { font-size: .75rem; color: var(--muted); margin-right: 4px; min-width: 2.2em; }
+.review-footer { display: grid; gap: 8px; }
+.change { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; padding: 14px 0; border-bottom: 1px solid var(--rule); align-items: start; cursor: pointer; }
+.change input { width: 22px; height: 22px; margin-top: 2px; accent-color: var(--blue); }
+.change .name { font-weight: 700; }
+.delta { font-size: .875rem; color: var(--muted); }
+.delta s { color: var(--muted); }
+.delta strong { color: var(--fg); }
+.review .summary { max-width: none; }
+.row .when { white-space: nowrap; }
+.review-set { display: grid; grid-template-columns: repeat(2, minmax(0, max-content)); gap: 6px 10px; padding: 6px 0; }
+.review-set > .muted { grid-column: 1 / -1; width: auto; }
+.mini-stepper input { width: 2.6em; }

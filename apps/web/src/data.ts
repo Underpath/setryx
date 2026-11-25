@@ -4,6 +4,8 @@ import type {
   ExerciseInput,
   ImportChoice,
   RoutineImportPreview,
+  SessionDetail,
+  SessionSummary,
   WorkoutInput,
   WorkoutSummary,
   WorkoutWithExercises,
@@ -109,4 +111,28 @@ export function useImportRoutines() {
 export function formatMinutes(seconds: number): string {
   const m = Math.round(seconds / 60);
   return m < 60 ? `${m} min` : `${Math.floor(m / 60)} h ${m % 60} min`;
+}
+
+// ── Sessions ──
+export function useSessions(limit = 20) {
+  return useQuery({
+    queryKey: ['sessions', limit],
+    queryFn: async () => (await api.get<{ sessions: SessionSummary[] }>(`/sessions?limit=${limit}`)).sessions,
+  });
+}
+
+export function useSession(id: string | null) {
+  return useQuery({
+    queryKey: ['sessions', 'one', id],
+    queryFn: async () => (await api.get<{ session: SessionDetail }>(`/sessions/${id}`)).session,
+    enabled: !!id,
+  });
+}
+
+export function useDeleteSession() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.del(`/sessions/${id}`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['sessions'] }),
+  });
 }

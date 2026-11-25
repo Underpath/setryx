@@ -1,7 +1,7 @@
 // The workout player as plain data + pure functions, so it can be saved after
 // every change, restored after a reload, and tested without a browser.
 import { type FlatStep, flattenWorkout } from './engine.ts';
-import type { WorkoutItem } from './workouts.ts';
+import type { SessionUpload, WorkoutItem } from './workouts.ts';
 
 export type SnapshotExercise = { name: string; equipment: string[]; instructions: string[] };
 
@@ -296,4 +296,66 @@ export function nextBlockPreview(s: PlayerState): { label: string; items: string
 
 export function loggedSets(s: PlayerState): SetLog[] {
   return Object.values(s.logs).sort((a, b) => a.stepIndex - b.stepIndex);
+}
+
+// ── After the workout ──
+
+
+export function sessionUploadOf(s: PlayerState): SessionUpload {
+  const ended = s.finishedAt ?? Date.now();
+  const steps = stepsOf(s);
+  return {
+    workoutId: s.workoutId || null,
+    workoutName: s.workoutName.slice(0, 80) || 'Workout',
+    icon: s.icon.slice(0, 16),
+    startedAt: s.startedAt ?? s.createdAt,
+    endedAt: ended,
+    durationMs: Math.min(24 * 3_600_000, elapsedMs(s, ended)),
+    status: Object.keys(s.logs).length >= steps.filter((x) => x.kind === 'exercise').length ? 'completed' : 'ended_early',
+    notes: null,
+    items: s.items,
+    exercises: s.exercises,
+    logs: loggedSets(s).map((l) => ({
+      ...l,
+      actualReps: l.actualReps == null ? null : Math.round(l.actualReps),
+      actualDurationS: l.actualDurationS == null ? null : Math.round(l.actualDurationS),
+    })),
+  };
+}
+
+export type TargetSuggestion = {
+  itemId: string;
+  exerciseId: string;
+  kind: 'reps' | 'timed';
+  planned: { reps: number | null; weight: number | null; durationS: number | null };
+  suggested: { reps: number | null; weight: number | null; durationS: number | null };
+  /** Per-round actuals, for showing "10, 9, 10". */
+  rounds: { reps: number | null; weight: number | null; durationS: number | null }[];
+  /** Every round matched the suggestion, so it's a safe default to apply. */
+  consistent: boolean;
+};
+
+/**
+ * For every exercise step where what you did differs from the plan, suggests
+ * new targets: the last round's actual values (per the plan). Steps you did
+ * exactly as planned are left out.
+ */
+export function targetSuggestions(s: PlayerState): TargetSuggestion[] {
+  const steps = stepsOf(s);
+  const byItem = new Map<string, SetLog[]>();
+  for (const l of loggedSets(s)) byItem.set(l.itemId, [...(byItem.get(l.itemId) ?? []), l]);
+  const out: TargetSuggestion[] = [];
+  for (const [itemId, logs] of byItem) {
+    const step = steps.find((x) => x.id === itemId);
+    if (!step || step.kind !== 'exercise') continue;
+    const timed = step.targetType === 'timed';
+    const actual = (l: SetLog) => ({ reps: timed ? null : l.actualReps, weight: l.actualWeight, durationS: timed ? l.actualDurationS : null });
+    const planned = { reps: timed ? null : step.targetReps, weight: step.targetWeight, durationS: timed ? step.targetDurationS : null };
+    const same = (a: typeof planned, b: typeof planned) => a.reps === b.reps && a.weight === b.weight && a.durationS === b.durationS;
+    const rounds = logs.map(actual);
+    if (rounds.every((r) => same(r, planned))) continue;
+    const suggested = rounds[rounds.length - 1]!;
+    out.push({ itemId, exerciseId: step.exerciseId, kind: timed ? 'timed' : 'reps', planned, suggested, rounds, consistent: rounds.every((r) => same(r, suggested)) });
+  }
+  return out;
 }

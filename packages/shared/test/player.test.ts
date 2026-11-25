@@ -122,3 +122,33 @@ test('next-block preview shows on the last step of the last round', () => {
   assert.equal(currentStep(s)!.id, 'r1');
   assert.equal(nextBlockPreview(s)?.label, 'Core');
 });
+
+test('target suggestions: only changed steps, last round wins, consistency flags the default', async () => {
+  const { targetSuggestions, sessionUploadOf } = await import('../src/player.ts');
+  let s = fresh();
+  s = next(s, T0).state; // press round 1 as planned (10 × 8)
+  s = next(s, T0 + 1000).state; // rest
+  s = next(s, T0 + 2000).state; // press round 2
+  s = adjustLog(s, 2, { actualReps: 9 }); // round 2: 9 reps
+  let sug = targetSuggestions(s);
+  assert.equal(sug.length, 1);
+  assert.deepEqual(sug[0]!.suggested, { reps: 9, weight: 8, durationS: null });
+  assert.equal(sug[0]!.consistent, false, 'only round 2 differed');
+  s = adjustLog(s, 0, { actualReps: 9 });
+  sug = targetSuggestions(s);
+  assert.equal(sug[0]!.consistent, true);
+
+  const up = sessionUploadOf({ ...s, finishedAt: T0 + 5000 });
+  assert.equal(up.logs.length, 2);
+  assert.equal(up.status, 'ended_early', 'the plank was never done');
+  assert.equal(up.workoutName, 'Push');
+});
+
+test('no suggestions when everything went to plan', async () => {
+  const { targetSuggestions } = await import('../src/player.ts');
+  let s = fresh();
+  for (let i = 0; i < 4; i++) s = next(s, T0 + i * 1000).state; // up to the 20 s plank
+  s = next(s, T0 + 3000 + 20_000).state; // plank held for the full 20 s
+  assert.equal(s.phase, 'finished');
+  assert.deepEqual(targetSuggestions(s), []);
+});

@@ -66,3 +66,18 @@ export const SESSION_EVENT = 'setryx:session';
 export function announce(): void {
   window.dispatchEvent(new Event(SESSION_EVENT));
 }
+
+export function getFinished(userId: string, id: string): PlayerState | null {
+  return loadFinished(userId).find((s) => s.id === id) ?? null;
+}
+
+export function updateFinished(state: PlayerState): void {
+  const list = loadFinished(state.userId);
+  write(finishedKey(state.userId), list.map((s) => (s.id === state.id ? state : s)));
+  announce();
+}
+
+export function removeFinished(userId: string, id: string): void {
+  write(finishedKey(userId), loadFinished(userId).filter((s) => s.id !== id));
+  announce();
+}

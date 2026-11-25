@@ -5,14 +5,17 @@ import { useMe, useSetupStatus, useThemeFromSettings } from './session.ts';
 import { BackGuardProvider } from './components/backGuard.tsx';
 import { Shell } from './components/Shell.tsx';
 import { LoginPage, SetupPage, SignupPage } from './pages/AuthPages.tsx';
-import { ComingSoonPage, TodayPage } from './pages/TodayPage.tsx';
+import { TodayPage } from './pages/TodayPage.tsx';
 import { SettingsPage } from './pages/SettingsPage.tsx';
 import { AdminPage } from './pages/AdminPage.tsx';
 import { WorkoutsPage } from './pages/WorkoutsPage.tsx';
 import { LibraryPage } from './pages/LibraryPage.tsx';
 import { WorkoutEditorPage } from './pages/WorkoutEditorPage.tsx';
 import { ImportPage } from './pages/ImportPage.tsx';
+import { StatsPage } from './pages/StatsPage.tsx';
 import { PlayerRoute, ResumeRoute } from './player/PlayerPage.tsx';
+import { ReviewRoute } from './player/ReviewPage.tsx';
+import { SyncRunner } from './sync/outbox.ts';
 
 const PUBLIC_PATHS = ['/login', '/signup', '/invite/'];
 
@@ -40,6 +43,7 @@ function Root() {
   if (isPublic || pathname === '/setup') return <Navigate to="/" replace />;
   return (
     <BackGuardProvider>
+      <SyncRunner userId={me.data.id} />
       <Outlet context={me.data} />
     </BackGuardProvider>
   );
@@ -63,7 +67,7 @@ const Settings = withUser(SettingsPage);
 const Admin = withUser(AdminPage);
 const Workouts = withUser(WorkoutsPage);
 const Library = withUser(LibraryPage);
-const Stats = withUser(({ user }) => <ComingSoonPage title="Stats" user={user} text="Charts and records appear once you’ve logged some workouts." />);
+const Stats = withUser(StatsPage);
 
 export const router = createBrowserRouter([
   {
@@ -79,6 +83,7 @@ export const router = createBrowserRouter([
       { path: '/workouts/:id', element: <WorkoutEditorPage /> },
       { path: '/play', element: <ResumeRoute /> },
       { path: '/play/:workoutId', element: <PlayerRoute /> },
+      { path: '/review/:sessionId', element: <ReviewRoute /> },
       {
         element: <SignedIn />,
         children: [

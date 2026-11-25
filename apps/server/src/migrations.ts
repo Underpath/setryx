@@ -92,4 +92,42 @@ export const migrations: { version: number; sql: string }[] = [
       CREATE INDEX workout_items_exercise ON workout_items(exercise_id);
     `,
   },
+  {
+    version: 3,
+    sql: `
+      CREATE TABLE sessions (
+        id            TEXT PRIMARY KEY,
+        user_id       TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        workout_id    TEXT,
+        workout_name  TEXT NOT NULL,
+        icon          TEXT NOT NULL DEFAULT '',
+        started_at    TEXT NOT NULL,
+        ended_at      TEXT NOT NULL,
+        duration_ms   INTEGER NOT NULL,
+        status        TEXT NOT NULL CHECK (status IN ('completed', 'ended_early')),
+        notes         TEXT,
+        snapshot      TEXT NOT NULL,
+        created_at    TEXT NOT NULL,
+        updated_at    TEXT NOT NULL
+      );
+      CREATE INDEX sessions_user_started ON sessions(user_id, started_at);
+
+      CREATE TABLE set_logs (
+        session_id         TEXT NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
+        step_index         INTEGER NOT NULL,
+        item_id            TEXT NOT NULL,
+        exercise_id        TEXT NOT NULL,
+        round              INTEGER,
+        planned_reps       INTEGER,
+        actual_reps        INTEGER,
+        planned_weight     REAL,
+        actual_weight      REAL,
+        planned_duration_s INTEGER,
+        actual_duration_s  INTEGER,
+        completed_at       TEXT NOT NULL,
+        PRIMARY KEY (session_id, step_index)
+      );
+      CREATE INDEX set_logs_exercise ON set_logs(exercise_id);
+    `,
+  },
 ];

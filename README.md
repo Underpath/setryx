@@ -2,7 +2,7 @@
 
 A self-hosted workout tracker for one household or a group of friends. It runs as a single Docker container serving plain HTTP. If you want HTTPS, put your own reverse proxy in front.
 
-Status: early development. Accounts, the exercise library, workout building, routine import and the workout player work; reviewing sessions and history come next.
+Status: early development. Accounts, the exercise library, workout building, routine import, the workout player, session review and offline sync work. Routines and charts come next.
 
 ## Run it
 
@@ -31,7 +31,7 @@ Secrets go only in `stack.env`, which git ignores.
 
 ### HTTPS (optional)
 
-setryx works over plain HTTP. With HTTPS, phones can also open the app with no connection (installable app) and use the browser's own keep-screen-on feature. Two example proxies:
+setryx works over plain HTTP, including finishing a workout with no connection: sessions are kept on the phone and upload when the server is reachable again. With HTTPS, phones can also install setryx as an app, open it with no connection at all, and use the browser's own keep-screen-on feature. Two example proxies:
 
 Caddy:
 ```

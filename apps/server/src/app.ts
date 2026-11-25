@@ -12,6 +12,7 @@ import { meRoutes } from './routes/me.ts';
 import { adminRoutes } from './routes/admin.ts';
 import { libraryRoutes } from './routes/library.ts';
 import { workoutRoutes } from './routes/workouts.ts';
+import { sessionRoutes } from './routes/sessions.ts';
 
 declare module 'fastify' {
   interface FastifyInstance {
@@ -77,6 +78,7 @@ export async function buildApp(config: Config, db: DB, opts: { logger?: boolean 
       await api.register(adminRoutes, { prefix: '/admin' });
       await api.register(libraryRoutes);
       await api.register(workoutRoutes);
+      await api.register(sessionRoutes);
     },
     { prefix: '/api/v1' },
   );

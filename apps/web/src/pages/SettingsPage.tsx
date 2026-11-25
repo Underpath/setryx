@@ -28,6 +28,8 @@ export function SettingsPage({ user }: { user: PublicUser }) {
     mutationFn: () => api.post('/auth/logout'),
     onSettled: () => {
       qc.clear();
+      // Offline copies of workouts belong to this account; drop them on sign-out.
+      if ('caches' in window) void caches.delete('setryx-api').catch(() => {});
       setMe(null);
       navigate('/login', { replace: true });
     },
