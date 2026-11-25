@@ -62,6 +62,9 @@ export function SettingsPage({ user }: { user: PublicUser }) {
         <h2 className="h3">During workouts</h2>
         <ul className="rows">
           <li className="row"><Switch label="Tap the screen to log a set" hint="When off, only the Log set button logs a set. Stops accidental taps from a towel or knee." checked={s.tapToLog} onChange={(v) => setSetting('tapToLog', v)} /></li>
+          {s.tapToLog && (
+            <li className="row"><Switch label="Show the “Tap anywhere” hint" hint="The line and circle under the weight that remind you the screen logs the set." checked={s.showTapHint} onChange={(v) => setSetting('showTapHint', v)} /></li>
+          )}
           <li className="row"><Switch label="Keep the screen on" hint="During workouts only." checked={s.keepAwake} onChange={(v) => setSetting('keepAwake', v)} /></li>
           <li className="row"><Switch label="Spoken cues" hint="Says what’s next before each rest ends." checked={s.voice} onChange={(v) => setSetting('voice', v)} /></li>
           <li className="row"><Switch label="Sounds" hint="Chimes at the end of timers and the countdown." checked={s.sounds} onChange={(v) => setSetting('sounds', v)} /></li>

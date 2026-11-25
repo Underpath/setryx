@@ -2,6 +2,7 @@ import type { ComponentType } from 'react';
 import { Navigate, Outlet, createBrowserRouter, useLocation } from 'react-router';
 import type { PublicUser } from '@setryx/shared';
 import { useMe, useSetupStatus, useThemeFromSettings } from './session.ts';
+import { BackGuardProvider } from './components/backGuard.tsx';
 import { Shell } from './components/Shell.tsx';
 import { LoginPage, SetupPage, SignupPage } from './pages/AuthPages.tsx';
 import { ComingSoonPage, TodayPage } from './pages/TodayPage.tsx';
@@ -11,7 +12,7 @@ import { WorkoutsPage } from './pages/WorkoutsPage.tsx';
 import { LibraryPage } from './pages/LibraryPage.tsx';
 import { WorkoutEditorPage } from './pages/WorkoutEditorPage.tsx';
 import { ImportPage } from './pages/ImportPage.tsx';
-import { PlayerRoute } from './player/PlayerPage.tsx';
+import { PlayerRoute, ResumeRoute } from './player/PlayerPage.tsx';
 
 const PUBLIC_PATHS = ['/login', '/signup', '/invite/'];
 
@@ -37,7 +38,11 @@ function Root() {
   const isPublic = PUBLIC_PATHS.some((p) => pathname.startsWith(p));
   if (!me.data) return isPublic ? <Outlet /> : <Navigate to="/login" replace />;
   if (isPublic || pathname === '/setup') return <Navigate to="/" replace />;
-  return <Outlet context={me.data} />;
+  return (
+    <BackGuardProvider>
+      <Outlet context={me.data} />
+    </BackGuardProvider>
+  );
 }
 
 function SignedIn() {
@@ -72,7 +77,7 @@ export const router = createBrowserRouter([
       { path: '/workouts/new', element: <WorkoutEditorPage /> },
       { path: '/workouts/import', element: <ImportPage /> },
       { path: '/workouts/:id', element: <WorkoutEditorPage /> },
-      { path: '/play', element: <PlayerRoute /> },
+      { path: '/play', element: <ResumeRoute /> },
       { path: '/play/:workoutId', element: <PlayerRoute /> },
       {
         element: <SignedIn />,

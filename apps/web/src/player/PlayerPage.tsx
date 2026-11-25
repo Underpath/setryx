@@ -20,14 +20,25 @@ import {
 } from '@setryx/shared';
 import { useMe } from '../session.ts';
 import { formatMinutes, useWorkout } from '../data.ts';
-import { FormError, Icon, Sheet } from '../components/ui.tsx';
+import { FormError, Icon, Sheet, useToast } from '../components/ui.tsx';
 import { clock, duration, uid, useMediaQuery } from '../util.ts';
 import { clearActive, loadActive } from './storage.ts';
 import { usePlayer } from './usePlayer.ts';
 import { useWakeLock } from './wakeLock.ts';
 
-// ── Route: /play/:workoutId starts (or offers to resume); /play resumes ──
+// ── Routes ──
+// /play resumes the session saved on this device. It's a separate component
+// from /play/:workoutId on purpose: when a started workout moves to /play,
+// React must mount fresh and read the saved session, not reuse stale state.
 
+export function ResumeRoute() {
+  const me = useMe();
+  const user = me.data!;
+  const [active] = useState<PlayerState | null>(() => loadActive(user.id));
+  return active ? <Player key={active.id} user={user} initial={active} /> : <Navigate to="/" replace />;
+}
+
+/** /play/:workoutId starts a workout, or offers to resume the one in progress. */
 export function PlayerRoute() {
   const { workoutId } = useParams();
   const me = useMe();
@@ -35,7 +46,7 @@ export function PlayerRoute() {
   const [active, setActive] = useState<PlayerState | null>(() => loadActive(user.id));
   const [choice, setChoice] = useState<'resume' | 'new' | null>(null);
 
-  if (!workoutId) return active ? <Player key={active.id} user={user} initial={active} /> : <Navigate to="/" replace />;
+  if (!workoutId) return <Navigate to="/play" replace />;
   if (active && choice === null) {
     return (
       <div className="player-gate">
@@ -91,7 +102,10 @@ function Player({ user, initial }: { user: PublicUser; initial: PlayerState }) {
   const p = usePlayer(initial, settings);
   const { state, now } = p;
   const running = state.phase === 'running';
-  const wake = useWakeLock(running && settings.keepAwake);
+  // Keep-screen-on starts from the setting and can be switched for this workout with the chip.
+  const [awake, setAwake] = useState(settings.keepAwake);
+  const wake = useWakeLock(running && awake);
+  const toast = useToast();
   const wide = useMediaQuery('(min-width: 1000px) and (orientation: landscape)');
   const [sheet, setSheet] = useState<'cues' | 'end' | null>(null);
   const navigate = useNavigate();
@@ -115,7 +129,7 @@ function Player({ user, initial }: { user: PublicUser; initial: PlayerState }) {
       <StartScreen
         state={state}
         onStart={() => {
-          if (settings.keepAwake) wake.kick();
+          if (awake) wake.kick();
           p.start();
         }}
       />
@@ -171,7 +185,7 @@ function Player({ user, initial }: { user: PublicUser; initial: PlayerState }) {
               {step.rir && <span><b>{step.rir}</b>reps in reserve</span>}
             </span>
           )}
-          {tapToLog && !state.paused && <span className="tap-hint">Tap anywhere to {step.targetType === 'timed' ? 'finish early' : 'log the set'}</span>}
+          {tapToLog && settings.showTapHint && !state.paused && <span className="tap-hint">Tap anywhere to {step.targetType === 'timed' ? 'finish early' : 'log the set'}</span>}
         </>
       ) : (
         <NextLine step={nextUp} name={ex(nextUp)?.name} big={final} />
@@ -236,7 +250,16 @@ function Player({ user, initial }: { user: PublicUser; initial: PlayerState }) {
           <svg className="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" /><path d="M12 11v6M12 7.5v.5" /></svg>
         </button>
       )}
-      {settings.keepAwake && <WakeChip status={wake.status} onRetry={wake.kick} />}
+      <WakeChip
+        wanted={awake}
+        status={wake.status}
+        onToggle={() => {
+          if (awake && wake.status !== 'on') return wake.kick(); // wanted but not working yet: try again
+          setAwake(!awake);
+          if (!awake) wake.kick();
+          toast(awake ? 'The screen can turn off now' : 'The screen stays on during this workout');
+        }}
+      />
     </div>
   );
 
@@ -256,7 +279,7 @@ function Player({ user, initial }: { user: PublicUser; initial: PlayerState }) {
     <div
       className={`player ${phaseClass}${wide ? ' t-player' : ''}`}
       // After a reload the keep-awake video can't start until the next tap; any tap retries it.
-      onPointerDown={() => settings.keepAwake && wake.status !== 'on' && wake.kick()}
+      onPointerDown={() => awake && wake.status !== 'on' && wake.kick()}
     >
       {timed && <div className="field-fill" style={{ height: `${fillPct}%`, right: wide ? 360 : 0 }} />}
       {wide ? (
@@ -344,18 +367,21 @@ function Stepper({ value, unit, step, label, onChange }: { value: number; unit: 
   );
 }
 
-function WakeChip({ status, onRetry }: { status: 'on' | 'off' | 'failed'; onRetry: () => void }) {
-  const on = status === 'on';
+function WakeChip({ wanted, status, onToggle }: { wanted: boolean; status: 'on' | 'off' | 'failed'; onToggle: () => void }) {
+  const on = wanted && status === 'on';
+  const label = !wanted ? 'Screen off' : on ? 'Screen on' : 'Screen may sleep';
   return (
     <button
       className={`wake${on ? '' : ' wake-off'}`}
       type="button"
-      onClick={onRetry}
-      aria-label={on ? 'Screen stays on' : 'Screen may sleep. Tap to try again'}
-      title={on ? 'The screen stays on during this workout' : 'Tap to try keeping the screen on again'}
+      role="switch"
+      aria-checked={wanted}
+      onClick={onToggle}
+      aria-label={`Keep the screen on: ${label}`}
+      title={!wanted ? 'Tap to keep the screen on' : on ? 'Tap to let the screen turn off' : 'Tap to try keeping the screen on again'}
     >
       <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4" /><path d="M12 2v2M12 20v2M2 12h2M20 12h2" /></svg>
-      <span className="wake-text">{on ? 'Screen on' : 'Screen may sleep'}</span>
+      <span className="wake-text">{label}</span>
     </button>
   );
 }

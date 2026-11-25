@@ -1,5 +1,6 @@
 import { type InputHTMLAttributes, type ReactNode, createContext, useCallback, useContext, useEffect, useId, useRef, useState } from 'react';
 import { ApiRequestError } from '../api.ts';
+import { useBackHandler } from './backGuard.tsx';
 
 // ── Icons ──
 const paths = {
@@ -70,6 +71,11 @@ export function Switch({ label, hint, checked, onChange }: { label: string; hint
 export function Sheet({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
   const ref = useRef<HTMLDivElement>(null);
   const titleId = useId();
+  // Phone back gesture / browser back closes the sheet instead of leaving the page.
+  useBackHandler(true, (nav) => {
+    nav.reset();
+    onClose();
+  });
   useEffect(() => {
     const prev = document.activeElement as HTMLElement | null;
     // Focus the first field (or else the first action), not the close button in the header.

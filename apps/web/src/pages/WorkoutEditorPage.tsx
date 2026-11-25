@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useBlocker, useNavigate, useParams } from 'react-router';
+import { Link, useNavigate, useParams } from 'react-router';
 import {
   type BlockStep,
   type Exercise,
@@ -16,6 +16,7 @@ import { ExerciseStepSheet, RestStepSheet, SupersetSheet } from '../components/s
 import { move, useSortable } from '../components/sortable.ts';
 import { FormError, Icon, LeaveDialog, Sheet, useBeforeUnload, useToast } from '../components/ui.tsx';
 import { uid } from '../util.ts';
+import { type BlockedNav, useAllowNextNavigation, useBackHandler } from '../components/backGuard.tsx';
 
 type Draft = { name: string; icon: string; notes: string | null; items: WorkoutItem[] };
 const EMPTY: Draft = { name: '', icon: '', notes: null, items: [] };
@@ -63,7 +64,8 @@ export function WorkoutEditorPage() {
   const [editing, setEditing] = useState<Editing>(null);
   const [error, setError] = useState<string | null>(null);
   const initialised = useRef(false);
-  const skipGuard = useRef(false);
+  const allowNext = useAllowNextNavigation();
+  const [leaving, setLeaving] = useState<BlockedNav | null>(null);
 
   useEffect(() => {
     if (!loaded.data || initialised.current) return;
@@ -77,7 +79,7 @@ export function WorkoutEditorPage() {
 
   const dirty = JSON.stringify(draft) !== saved;
   useBeforeUnload(dirty);
-  const blocker = useBlocker(({ currentLocation, nextLocation }) => !skipGuard.current && dirty && currentLocation.pathname !== nextLocation.pathname);
+  useBackHandler(dirty, (nav) => setLeaving(nav));
 
   // ── Draft helpers ──
   const setItems = (fn: (items: WorkoutItem[]) => WorkoutItem[]) => setDraft((d) => ({ ...d, items: fn(d.items) }));
@@ -147,7 +149,7 @@ export function WorkoutEditorPage() {
     const parsed = workoutInputSchema.safeParse(draft);
     if (!parsed.success) {
       setError(parsed.error.issues[0]?.message ?? 'Some steps need fixing.');
-      blocker.state === 'blocked' && blocker.reset();
+      if (leaving) (leaving.reset(), setLeaving(null));
       return;
     }
     setError(null);
@@ -162,21 +164,20 @@ export function WorkoutEditorPage() {
           toast('Workout saved');
           if (then) then();
           else if (isNew) {
-            skipGuard.current = true;
+            allowNext();
             navigate(`/workouts/${data.workout.id}`, { replace: true });
-            skipGuard.current = false;
           }
         },
         onError: (err) => {
           setError(err.message);
-          blocker.state === 'blocked' && blocker.reset();
+          if (leaving) (leaving.reset(), setLeaving(null));
         },
       },
     );
   };
 
   const leaveTo = (to: string) => {
-    skipGuard.current = true;
+    allowNext();
     navigate(to);
   };
 
@@ -368,14 +369,14 @@ export function WorkoutEditorPage() {
         </Sheet>
       )}
 
-      {blocker.state === 'blocked' && (
+      {leaving && (
         <LeaveDialog
           message={`You have unsaved changes to ${draft.name || 'this workout'}. If you leave now without saving, those changes are lost.`}
           saveLabel="Save workout"
           saving={save.isPending}
-          onSave={() => doSave(() => blocker.proceed?.())}
-          onDiscard={() => blocker.proceed?.()}
-          onKeep={() => blocker.reset?.()}
+          onSave={() => doSave(() => (leaving.proceed(), setLeaving(null)))}
+          onDiscard={() => (leaving.proceed(), setLeaving(null))}
+          onKeep={() => (leaving.reset(), setLeaving(null))}
         />
       )}
     </main>
@@ -417,9 +418,10 @@ function SupersetBlock({
 }) {
   const sort = useSortable(onReorder);
   return (
-    <section className="block" data-sort-key={superset.id} aria-label={superset.label || 'Superset'}>
+    <section className="block block-superset" data-sort-key={superset.id} aria-label={superset.label || 'Superset'}>
+      {/* The thick bar on the left is the handle: press and drag to move the superset. */}
+      <span className="block-bar" title="Hold and drag to move this superset" aria-hidden {...handle} />
       <div className="block-head">
-        <span className="grip" aria-hidden {...handle}><Icon name="grip" /></span>
         <button className="block-title" type="button" onClick={onEdit}>
           <span className="name">{superset.label || 'Superset'}</span>
           <span className="rounds">{superset.rounds} round{superset.rounds === 1 ? '' : 's'}</span>

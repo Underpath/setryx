@@ -22,6 +22,7 @@ export const userSettingsSchema = z.object({
   sounds: z.boolean().default(true),
   keepAwake: z.boolean().default(true),
   tapToLog: z.boolean().default(true),
+  showTapHint: z.boolean().default(true),
   warnSeconds: z.number().int().min(0).max(60).default(10),
   theme: z.enum(['system', 'light', 'dark']).default('system'),
 });

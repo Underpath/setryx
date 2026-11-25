@@ -1,6 +1,6 @@
-import { type FormEvent, type ReactNode, useState } from 'react';
+import { type FormEvent, type ReactNode, useId, useState } from 'react';
 import type { Exercise, ExerciseStep, ExerciseType, RestStep, Superset } from '@setryx/shared';
-import { Field, LeaveDialog, Sheet } from './ui.tsx';
+import { Field, LeaveDialog, Sheet, useBeforeUnload } from './ui.tsx';
 
 /**
  * Wraps a step form: closing with changes asks to save the step or discard the changes.
@@ -8,6 +8,7 @@ import { Field, LeaveDialog, Sheet } from './ui.tsx';
  */
 function GuardedSheet({ title, dirty, what, onApply, onClose, children }: { title: string; dirty: boolean; what: string; onApply: () => void; onClose: () => void; children: (submit: (e?: FormEvent) => void) => ReactNode }) {
   const [leaving, setLeaving] = useState(false);
+  useBeforeUnload(dirty); // closing or reloading the tab with step changes
   const submit = (e?: FormEvent) => {
     e?.preventDefault();
     onApply();
@@ -34,6 +35,47 @@ const numOrNull = (s: string): number | null => {
   const n = Number(s.replace(',', '.'));
   return s.trim() === '' || !Number.isFinite(n) ? null : n;
 };
+
+
+/**
+ * A number field with − and + buttons. Typing is free (decimals like 22.5 are
+ * fine where allowed); the buttons step from whatever is there, keeping decimals.
+ */
+function NumberField({ label, value, onChange, step, decimals, min = 0, emptyLabel, error, hint }: {
+  label: string; value: string; onChange: (v: string) => void; step: number; decimals: boolean; min?: number; emptyLabel?: string; error?: string; hint?: string;
+}) {
+  const id = useId();
+  const current = numOrNull(value);
+  const fmt = (n: number) => String(Math.round(n * 100) / 100);
+  const bump = (dir: 1 | -1) => {
+    if (current === null) {
+      if (dir === 1) onChange(fmt(Math.max(min, step)));
+      return;
+    }
+    const nextVal = current + dir * step;
+    if (nextVal < min) return onChange(emptyLabel ? '' : fmt(min));
+    onChange(fmt(nextVal));
+  };
+  return (
+    <div className="field">
+      <label htmlFor={id}>{label}</label>
+      <div className="num-field">
+        <button type="button" className="num-btn" aria-label={`Less ${label.toLowerCase()}`} onClick={() => bump(-1)} disabled={current === null && !!emptyLabel}>−</button>
+        <input
+          id={id}
+          className="input"
+          inputMode={decimals ? 'decimal' : 'numeric'}
+          value={value}
+          placeholder={emptyLabel}
+          onChange={(e) => onChange(decimals ? e.target.value.replace(/[^0-9.,]/g, '') : e.target.value.replace(/[^0-9]/g, ''))}
+          aria-invalid={error ? true : undefined}
+        />
+        <button type="button" className="num-btn" aria-label={`More ${label.toLowerCase()}`} onClick={() => bump(1)}>+</button>
+      </div>
+      {error ? <div className="field-error">{error}</div> : hint ? <div className="hint">{hint}</div> : null}
+    </div>
+  );
+}
 
 type StepActions = { onMoveUp?: () => void; onMoveDown?: () => void; onDuplicate?: () => void; onRemove: () => void };
 
@@ -114,11 +156,11 @@ export function ExerciseStepSheet({
           </div>
           <div className="field-row">
             {f.targetType === 'reps' ? (
-              <Field label="Reps" inputMode="numeric" value={f.reps} onChange={(e) => set({ reps: e.target.value })} error={errors.reps} />
+              <NumberField label="Reps" value={f.reps} onChange={(v) => set({ reps: v })} step={1} min={1} decimals={false} error={errors.reps} />
             ) : (
-              <Field label="Seconds" inputMode="numeric" value={f.duration} onChange={(e) => set({ duration: e.target.value })} error={errors.duration} />
+              <NumberField label="Seconds" value={f.duration} onChange={(v) => set({ duration: v })} step={5} min={5} decimals={false} error={errors.duration} />
             )}
-            <Field label="Weight (kg)" inputMode="decimal" value={f.weight} onChange={(e) => set({ weight: e.target.value })} error={errors.weight} hint="Leave empty for bodyweight." />
+            <NumberField label="Weight (kg)" value={f.weight} onChange={(v) => set({ weight: v })} step={1} decimals emptyLabel="Bodyweight" error={errors.weight} hint="Type decimals like 22.5. Empty means bodyweight." />
           </div>
           <div className="field-row">
             <Field label="Tempo" value={f.tempo} onChange={(e) => set({ tempo: e.target.value })} placeholder="3-1-1-0" />
@@ -151,7 +193,7 @@ export function RestStepSheet({ step, isNew, onSave, onClose, ...actions }: { st
     <GuardedSheet title="Rest" what="rest" dirty={dirty} onApply={apply} onClose={onClose}>
       {(submit) => (
         <form className="form" onSubmit={submit} noValidate>
-          <Field label="Seconds" inputMode="numeric" value={f.duration} onChange={(e) => setF({ ...f, duration: e.target.value })} error={error} />
+          <NumberField label="Seconds" value={f.duration} onChange={(v) => setF({ ...f, duration: v })} step={5} min={5} decimals={false} error={error} />
           <div className="chips">
             {[15, 30, 45, 60, 90, 120].map((s) => (
               <button key={s} type="button" className={`chip${f.duration === String(s) ? ' on' : ''}`} onClick={() => setF({ ...f, duration: String(s) })}>{s} s</button>
@@ -181,7 +223,7 @@ export function SupersetSheet({ superset, isNew, onSave, onClose, ...actions }: 
       {(submit) => (
         <form className="form" onSubmit={submit} noValidate>
           <Field label="Name" value={f.label} onChange={(e) => setF({ ...f, label: e.target.value })} placeholder="Chest press and side delts" />
-          <Field label="Rounds" inputMode="numeric" value={f.rounds} onChange={(e) => setF({ ...f, rounds: e.target.value })} error={error} hint="Every step in the superset repeats this many times." />
+          <NumberField label="Rounds" value={f.rounds} onChange={(v) => setF({ ...f, rounds: v })} step={1} min={1} decimals={false} error={error} hint="Every step in the superset repeats this many times." />
           <button className="btn btn-primary btn-block" type="submit">Save superset</button>
           {!isNew && <StepActionsRow {...actions} close={onClose} />}
         </form>
