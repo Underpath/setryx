@@ -7,13 +7,15 @@ import { useLogout, useMe, useSetMe } from '../session.ts';
 import { Field, FormError, Icon, Sheet, Switch, fieldErrors, useToast } from '../components/ui.tsx';
 import { useMediaQuery } from '../util.ts';
 import { InvitesSection, UsersSection } from './AdminPage.tsx';
+import { ApiTokensSection } from './ApiTokensSection.tsx';
 
-type SectionId = 'account' | 'workouts' | 'general' | 'data' | 'people' | 'photos' | 'backups';
+type SectionId = 'account' | 'workouts' | 'general' | 'data' | 'api' | 'people' | 'photos' | 'backups';
 const SECTIONS: { id: SectionId; label: string; hint: string; admin?: boolean }[] = [
   { id: 'account', label: 'Account', hint: 'Name and password' },
   { id: 'workouts', label: 'During workouts', hint: 'Tapping, screen, sounds, warning' },
   { id: 'general', label: 'General', hint: 'Theme and start of the week' },
   { id: 'data', label: 'Import and export', hint: 'Bring workouts in, take everything out' },
+  { id: 'api', label: 'API tokens', hint: 'For scripts and AI agents' },
   { id: 'people', label: 'People and invites', hint: 'Accounts on this server', admin: true },
   { id: 'photos', label: 'Exercise photos', hint: 'Allow, download or remove', admin: true },
   { id: 'backups', label: 'Backups', hint: 'Database copies for your volume backups', admin: true },
@@ -102,6 +104,8 @@ export function SettingsSection() {
       return <GeneralPrefs user={user} />;
     case 'data':
       return <DataSection />;
+    case 'api':
+      return <ApiTokensSection />;
     case 'people':
       return user.role === 'admin' ? (
         <>

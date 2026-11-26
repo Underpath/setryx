@@ -16,6 +16,7 @@ import { HttpError, parse } from '../http.ts';
 import { createInvite, deleteInvite, listInvites } from '../invites.ts';
 import { hashPassword } from '../passwords.ts';
 import { deleteUserSessions } from '../sessions.ts';
+import { deleteUserApiTokens } from '../api-tokens.ts';
 import {
   countActiveAdmins,
   findUserById,
@@ -81,6 +82,8 @@ export const adminRoutes: FastifyPluginAsync = async (app) => {
     await setPassword(db, target.id, body.password);
     // Their old sessions stop working; resetting your own keeps this device signed in.
     deleteUserSessions(db, target.id, target.id === req.user!.id ? req.sessionToken ?? undefined : undefined);
+    // An admin reset is for a lost or compromised account, so API tokens go too.
+    deleteUserApiTokens(db, target.id);
     return reply.status(204).send();
   });
 

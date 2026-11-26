@@ -176,6 +176,8 @@ a { color: var(--blue-text); }
 
 .copy-box { display: flex; gap: 8px; align-items: center; }
 .copy-box input { font-size: .875rem; }
+.input.mono { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-size: .8125rem; }
+.token-hint { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-size: .75rem; font-weight: 400; color: var(--muted); }
 .toast { position: fixed; left: 50%; top: calc(14px + env(safe-area-inset-top)); transform: translateX(-50%); max-width: calc(100vw - 32px); text-align: center; background: var(--fg); color: var(--bg); padding: 10px 18px; border-radius: 999px; font-weight: 700; font-size: .9rem; z-index: 60; }
 .center-load { min-height: 100%; display: grid; place-items: center; color: var(--muted); }
 

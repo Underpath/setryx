@@ -11,6 +11,7 @@ What it does:
 - **Routines:** a rotation (Push A, Pull A, …), a one-off programme, or a weekly plan. Today shows what's up next.
 - **Stats:** a streak, a calendar, sessions per week, and charts and records for each exercise.
 - **Accounts:** everyone has their own data; an admin adds people or sends invite links.
+- **API:** personal tokens let scripts and AI agents read and edit your workouts (see [API](#api)).
 
 Status: working towards v1.0. Everything above works; the remaining work before v1.0 is behind the scenes, not in the app's screens.
 
@@ -98,6 +99,19 @@ docker compose start setryx
 
 Replace `setryx-latest.db` with whichever copy you want. Run these from the folder with your `docker-compose.yml`.
 
+### API
+
+Scripts and AI agents can use your data through the API. Create a token under **Settings → API tokens**, then send it with every request:
+
+```bash
+curl -H "Authorization: Bearer setryx_…" http://<your-server>:38471/api/v1/workouts
+```
+
+- **Read only** tokens can look at your exercises, workouts, routines, sessions and stats. **Read and write** tokens can also create, change and delete them.
+- A token only ever sees its owner's data. It can't sign in, change account or server settings (people, photos, backups), import or export, or manage tokens.
+- Tokens can expire after 30 days, 90 days or a year, or never. Revoke one at any time. Disabling an account stops its tokens; an admin password reset (or `reset-password`) revokes them.
+- Every endpoint a token can use is described in OpenAPI at `/api/v1/openapi.json`.
+
 ### Locked out?
 
 ```bash
@@ -108,7 +122,7 @@ docker exec -it setryx list-users
 docker exec -it setryx reset-password <username>
 ```
 
-This also turns the account back on and signs it out everywhere.
+This also turns the account back on, signs it out everywhere and revokes its API tokens.
 
 ## Develop
 

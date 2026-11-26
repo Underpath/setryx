@@ -5,6 +5,7 @@ import { createInterface } from 'node:readline/promises';
 import { passwordSchema } from '@setryx/shared';
 import { loadConfig } from './config.ts';
 import { openDb } from './db.ts';
+import { deleteUserApiTokens } from './api-tokens.ts';
 import { deleteUserSessions } from './sessions.ts';
 import { findUserByUsername, listUsers, setPassword, updateUser } from './users.ts';
 
@@ -47,7 +48,8 @@ async function main(): Promise<number> {
       await setPassword(db, user.id, password);
       if (user.disabled) updateUser(db, user.id, { disabled: false });
       deleteUserSessions(db, user.id);
-      console.log(`Password changed for ${user.username}. They're signed out everywhere and can sign in with the new password.`);
+      deleteUserApiTokens(db, user.id);
+      console.log(`Password changed for ${user.username}. They're signed out everywhere, their API tokens are revoked, and they can sign in with the new password.`);
       return 0;
     }
     default:

@@ -137,6 +137,31 @@ export const defaultBackupSettings = (dataDir: string): BackupSettings => ({ dir
 
 export type BackupFile = { name: string; kind: 'latest' | 'before-update' | 'manual'; bytes: number; modifiedAt: string };
 
+// ── API tokens ────────────────────────────────────────────
+
+/** read: look only. write: also create, change and delete exercises, workouts, routines and sessions. */
+export const apiTokenScopeSchema = z.enum(['read', 'write']);
+export type ApiTokenScope = z.infer<typeof apiTokenScopeSchema>;
+
+export const createApiTokenRequestSchema = z.object({
+  name: z.string().trim().min(1, 'Give the token a name.').max(60, 'Use at most 60 characters.'),
+  scope: apiTokenScopeSchema,
+  /** Null: never expires. */
+  expiresInDays: z.union([z.literal(30), z.literal(90), z.literal(365)]).nullable(),
+});
+export type CreateApiTokenRequest = z.infer<typeof createApiTokenRequestSchema>;
+
+export type ApiToken = {
+  id: string;
+  name: string;
+  scope: ApiTokenScope;
+  /** The first characters of the token, to tell tokens apart. */
+  hint: string;
+  createdAt: string;
+  lastUsedAt: string | null;
+  expiresAt: string | null;
+};
+
 // ── Errors ────────────────────────────────────────────────
 
 export type ApiError = {

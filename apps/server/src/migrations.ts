@@ -160,4 +160,22 @@ export const migrations: { version: number; sql: string }[] = [
       CREATE INDEX sessions_routine ON sessions(routine_id, started_at);
     `,
   },
+  {
+    version: 5,
+    sql: `
+      -- Personal API tokens. Only a hash of the token is stored.
+      CREATE TABLE api_tokens (
+        id            TEXT PRIMARY KEY,
+        user_id       TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        name          TEXT NOT NULL,
+        token_hash    TEXT NOT NULL UNIQUE,
+        hint          TEXT NOT NULL,
+        scope         TEXT NOT NULL CHECK (scope IN ('read', 'write')),
+        created_at    TEXT NOT NULL,
+        last_used_at  TEXT,
+        expires_at    TEXT
+      );
+      CREATE INDEX api_tokens_user ON api_tokens(user_id);
+    `,
+  },
 ];

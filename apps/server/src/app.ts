@@ -4,6 +4,7 @@ import rateLimit from '@fastify/rate-limit';
 import fastifyStatic from '@fastify/static';
 import type { Config } from './config.ts';
 import type { DB } from './db.ts';
+import { type ResolvedToken, resolveApiToken, tokenMayUse } from './api-tokens.ts';
 import { Backups } from './backup.ts';
 import { HttpError, isSameOrigin, sendError } from './http.ts';
 import { SESSION_COOKIE, resolveSession } from './sessions.ts';
@@ -16,6 +17,8 @@ import { workoutRoutes } from './routes/workouts.ts';
 import { sessionRoutes } from './routes/sessions.ts';
 import { routineRoutes } from './routes/routines.ts';
 import { statsRoutes } from './routes/stats.ts';
+import { tokenRoutes } from './routes/tokens.ts';
+import { openApiDocument } from './openapi.ts';
 
 declare module 'fastify' {
   interface FastifyInstance {
@@ -26,6 +29,8 @@ declare module 'fastify' {
   interface FastifyRequest {
     user: UserRecord | null;
     sessionToken: string | null;
+    /** Set when the request authenticated with a personal API token instead of the session cookie. */
+    apiToken: ResolvedToken | null;
   }
 }
 
@@ -41,6 +46,7 @@ export async function buildApp(config: Config, db: DB, opts: { logger?: boolean 
   app.decorate('backups', new Backups(db, config.dataDir));
   app.decorateRequest('user', null);
   app.decorateRequest('sessionToken', null);
+  app.decorateRequest('apiToken', null);
 
   await app.register(cookie, { secret: config.sessionSecret });
   await app.register(rateLimit, { global: false });
@@ -54,9 +60,29 @@ export async function buildApp(config: Config, db: DB, opts: { logger?: boolean 
     return sendError(reply, new HttpError(500, 'server_error', 'Something went wrong on the server. Check the container logs.'));
   });
 
-  // Resolve the session cookie on every API request.
+  // Resolve the API token or the session cookie on every API request.
   app.addHook('onRequest', async (req, reply) => {
     if (!req.url.startsWith('/api/')) return;
+    // A personal API token. Cookies are ignored, and no Origin check is needed:
+    // browsers never attach this header on their own, so it can't be forged cross-site.
+    const auth = req.headers.authorization;
+    if (auth !== undefined) {
+      const invalid = new HttpError(401, 'invalid_token', 'This API token is wrong, expired or revoked.');
+      const m = /^Bearer\s+(\S+)$/i.exec(auth);
+      const token = m ? resolveApiToken(db, m[1]!) : null;
+      if (!token) throw invalid;
+      const user = findUserById(db, token.userId);
+      if (!user || user.disabled) throw invalid;
+      const route = req.routeOptions.url;
+      if (route) {
+        const access = tokenMayUse(token.scope, req.method, route);
+        if (access === 'read_only') throw new HttpError(403, 'read_only_token', 'This token can only read. Create a read and write token to make changes.');
+        if (access === 'not_allowed') throw new HttpError(403, 'not_allowed_with_token', 'API tokens can’t do this. Sign in to setryx to do it.');
+      }
+      req.user = user;
+      req.apiToken = token;
+      return;
+    }
     if (!['GET', 'HEAD', 'OPTIONS'].includes(req.method) && !isSameOrigin(req)) {
       throw new HttpError(403, 'bad_origin', 'This request came from another site and was blocked.');
     }
@@ -76,6 +102,10 @@ export async function buildApp(config: Config, db: DB, opts: { logger?: boolean 
   // Polled by the Docker health check every 30 s; keep it out of the logs.
   app.get('/api/health', { logLevel: 'warn' }, async () => ({ ok: true }));
 
+  // Describes everything an API token can do. Public: it holds no data.
+  let spec: object | null = null;
+  app.get('/api/v1/openapi.json', async () => (spec ??= openApiDocument()));
+
   await app.register(
     async (api) => {
       await api.register(authRoutes);
@@ -86,6 +116,7 @@ export async function buildApp(config: Config, db: DB, opts: { logger?: boolean 
       await api.register(sessionRoutes);
       await api.register(routineRoutes);
       await api.register(statsRoutes);
+      await api.register(tokenRoutes);
     },
     { prefix: '/api/v1' },
   );
