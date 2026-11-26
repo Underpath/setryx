@@ -1,8 +1,8 @@
 import { type FormEvent, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { ApiToken, ApiTokenScope, CreateApiTokenRequest } from '@setryx/shared';
+import type { ApiToken, ApiTokenScope, CreateApiTokenRequest, PublicUser } from '@setryx/shared';
 import { api } from '../api.ts';
-import { Field, FormError, Icon, Sheet, fieldErrors, useToast } from '../components/ui.tsx';
+import { Field, FormError, Icon, Sheet, Switch, fieldErrors, useToast } from '../components/ui.tsx';
 
 const dateFmt = new Intl.DateTimeFormat(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
 const SCOPE_LABEL: Record<ApiTokenScope, string> = { read: 'Read only', write: 'Read and write' };
@@ -20,11 +20,11 @@ const metaOf = (t: ApiToken) =>
     t.expiresAt ? `Expires ${dateFmt.format(new Date(t.expiresAt))}` : 'Doesn’t expire',
   ].join('. ') + '.';
 
-/** Settings → API tokens: personal tokens for scripts and AI agents. */
-export function ApiTokensSection() {
+/** Settings → API and AI agents: personal tokens for scripts and AI agents. */
+export function ApiTokensSection({ user }: { user: PublicUser }) {
   const qc = useQueryClient();
   const toast = useToast();
-  const tokens = useQuery({ queryKey: ['tokens'], queryFn: () => api.get<{ tokens: ApiToken[] }>('/tokens') });
+  const tokens = useQuery({ queryKey: ['tokens'], queryFn: () => api.get<{ tokens: ApiToken[]; mcpEnabled: boolean }>('/tokens') });
   const [creating, setCreating] = useState(false);
   const [secret, setSecret] = useState<string | null>(null);
   const [revoking, setRevoking] = useState<ApiToken | null>(null);
@@ -62,6 +62,8 @@ export function ApiTokensSection() {
           ))}
         </ul>
       </section>
+
+      <McpSection user={user} enabled={tokens.data?.mcpEnabled ?? true} />
 
       {creating && (
         <NewTokenSheet
@@ -152,5 +154,71 @@ function TokenReadySheet({ secret, onClose }: { secret: string; onClose: () => v
       <p className="small muted">Send it with each request as the header <code>Authorization: Bearer</code> followed by the token.</p>
       <button className="btn btn-primary btn-block" type="button" onClick={onClose}>Done</button>
     </Sheet>
+  );
+}
+
+/** How to connect an AI agent over MCP, and (for admins) whether it's allowed. */
+function McpSection({ user, enabled }: { user: PublicUser; enabled: boolean }) {
+  const qc = useQueryClient();
+  const toast = useToast();
+  const url = `${window.location.origin}/mcp`;
+  const command = `claude mcp add --transport http setryx ${url} --header "Authorization: Bearer YOUR_TOKEN"`;
+  const toggle = useMutation({
+    mutationFn: (on: boolean) => api.patch<{ enabled: boolean }>('/admin/mcp', { enabled: on }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['tokens'] }),
+    onError: (err) => toast(err.message),
+  });
+  const copy = async (value: string, id: string, what: string) => {
+    try {
+      await navigator.clipboard.writeText(value);
+      toast(`${what} copied`);
+    } catch {
+      (document.getElementById(id) as HTMLInputElement | null)?.select();
+      toast(`Select the ${what.toLowerCase()} and copy it`);
+    }
+  };
+  return (
+    <section className="section">
+      <h2 className="h3">AI agents (MCP)</h2>
+      <p className="muted small" style={{ marginBottom: 10 }}>
+        Agents like Claude can connect to setryx over MCP and use your data in conversation: what’s next, your history, building workouts and routines,
+        logging a session. They sign in with one of your tokens, so they can do exactly what that token allows. Clients that ask before changes will ask
+        before deleting anything.
+      </p>
+      {user.role === 'admin' && (
+        <ul className="rows" style={{ marginBottom: 12 }}>
+          <li className="row">
+            <Switch
+              label="Allow MCP on this server"
+              hint="For everyone with a token. Turning it off leaves the API and tokens working."
+              checked={enabled}
+              onChange={(v) => toggle.mutate(v)}
+            />
+          </li>
+        </ul>
+      )}
+      {enabled ? (
+        <div className="form">
+          <div className="field">
+            <label htmlFor="mcp-url">Server address</label>
+            <div className="copy-box">
+              <input id="mcp-url" className="input mono" readOnly value={url} onFocus={(e) => e.currentTarget.select()} />
+              <button className="icon-btn btn-quiet" type="button" onClick={() => copy(url, 'mcp-url', 'Address')} aria-label="Copy address"><Icon name="copy" /></button>
+            </div>
+            <div className="hint">Use your server’s public address if agents connect from elsewhere. Send the token as the header Authorization: Bearer followed by the token.</div>
+          </div>
+          <div className="field">
+            <label htmlFor="mcp-cmd">Claude Code</label>
+            <div className="copy-box">
+              <input id="mcp-cmd" className="input mono" readOnly value={command} onFocus={(e) => e.currentTarget.select()} />
+              <button className="icon-btn btn-quiet" type="button" onClick={() => copy(command, 'mcp-cmd', 'Command')} aria-label="Copy command"><Icon name="copy" /></button>
+            </div>
+            <div className="hint">Replace YOUR_TOKEN with a token from above.</div>
+          </div>
+        </div>
+      ) : (
+        <p className="muted small">{user.role === 'admin' ? 'MCP is off. The API still works with tokens.' : 'An admin has turned MCP off on this server. The API still works with tokens.'}</p>
+      )}
+    </section>
   );
 }

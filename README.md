@@ -11,7 +11,7 @@ What it does:
 - **Routines:** a rotation (Push A, Pull A, …), a one-off programme, or a weekly plan. Today shows what's up next.
 - **Stats:** a streak, a calendar, sessions per week, and charts and records for each exercise.
 - **Accounts:** everyone has their own data; an admin adds people or sends invite links.
-- **API:** personal tokens let scripts and AI agents read and edit your workouts (see [API](#api)).
+- **API and MCP:** personal tokens let scripts and AI agents read and edit your workouts (see [API](#api) and [AI agents](#ai-agents-mcp)).
 
 Status: working towards v1.0. Everything above works; the remaining work before v1.0 is behind the scenes, not in the app's screens.
 
@@ -101,7 +101,7 @@ Replace `setryx-latest.db` with whichever copy you want. Run these from the fold
 
 ### API
 
-Scripts and AI agents can use your data through the API. Create a token under **Settings → API tokens**, then send it with every request:
+Scripts and AI agents can use your data through the API. Create a token under **Settings → API and AI agents**, then send it with every request:
 
 ```bash
 curl -H "Authorization: Bearer setryx_…" http://<your-server>:38471/api/v1/workouts
@@ -111,6 +111,16 @@ curl -H "Authorization: Bearer setryx_…" http://<your-server>:38471/api/v1/wor
 - A token only ever sees its owner's data. It can't sign in, change account or server settings (people, photos, backups), import or export, or manage tokens.
 - Tokens can expire after 30 days, 90 days or a year, or never. Revoke one at any time. Disabling an account stops its tokens; an admin password reset (or `reset-password`) revokes them.
 - Every endpoint a token can use is described in OpenAPI at `/api/v1/openapi.json`.
+
+### AI agents (MCP)
+
+Agents like Claude can connect to setryx over MCP at `http://<your-server>:38471/mcp`, signing in with an API token. For example, in Claude Code:
+
+```bash
+claude mcp add --transport http setryx http://<your-server>:38471/mcp --header "Authorization: Bearer setryx_…"
+```
+
+The agent gets tools to check what's next and your training summary; search exercises and read your history; create and edit workouts, targets and routines; and log a session done without the app. Exercises, workouts and routines can be named instead of given by id. A read-only token only gets the reading tools. Tools that delete are marked so clients ask first, and sessions can't be deleted over MCP. An admin can turn MCP off under **Settings → API and AI agents**; the API keeps working.
 
 ### Locked out?
 

@@ -292,7 +292,7 @@ export function openApiDocument(): Json {
       title: 'setryx API',
       version: '1',
       description:
-        'Your own training data: exercises, workouts, routines, sessions and stats. Authenticate with a personal API token from Settings → API tokens, sent as `Authorization: Bearer <token>`. A read-only token can use every GET; a read and write token can also create, change and delete. Tokens can’t sign in, change account or server settings, or manage other tokens.',
+        'Your own training data: exercises, workouts, routines, sessions and stats. Authenticate with a personal API token from Settings → API and AI agents, sent as `Authorization: Bearer <token>`. A read-only token can use every GET; a read and write token can also create, change and delete. Tokens can’t sign in, change account or server settings, or manage other tokens.',
     },
     servers: [{ url: '/api/v1' }],
     security: [{ token: [] }],

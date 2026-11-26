@@ -19,6 +19,7 @@ import { routineRoutes } from './routes/routines.ts';
 import { statsRoutes } from './routes/stats.ts';
 import { tokenRoutes } from './routes/tokens.ts';
 import { openApiDocument } from './openapi.ts';
+import { mcpRoutes } from './mcp/server.ts';
 
 declare module 'fastify' {
   interface FastifyInstance {
@@ -120,6 +121,7 @@ export async function buildApp(config: Config, db: DB, opts: { logger?: boolean 
     },
     { prefix: '/api/v1' },
   );
+  await app.register(mcpRoutes);
 
   app.setNotFoundHandler((req, reply) => {
     if (req.url.startsWith('/api/')) return sendError(reply, new HttpError(404, 'not_found', 'No such endpoint.'));

@@ -3,13 +3,14 @@ import { createApiTokenRequestSchema } from '@setryx/shared';
 import { requireUser } from '../app.ts';
 import { createApiToken, deleteApiToken, listApiTokens } from '../api-tokens.ts';
 import { HttpError, parse } from '../http.ts';
+import { mcpEnabled } from '../mcp/server.ts';
 
 /** Personal API tokens, managed only while signed in (a token can't manage tokens). */
 export const tokenRoutes: FastifyPluginAsync = async (app) => {
   const { db } = app;
   app.addHook('preHandler', async (req) => void requireUser(req));
 
-  app.get('/tokens', async (req) => ({ tokens: listApiTokens(db, req.user!.id) }));
+  app.get('/tokens', async (req) => ({ tokens: listApiTokens(db, req.user!.id), mcpEnabled: mcpEnabled(db) }));
 
   app.post('/tokens', async (req, reply) => {
     const body = parse(createApiTokenRequestSchema, req.body);

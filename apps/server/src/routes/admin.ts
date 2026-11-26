@@ -17,6 +17,7 @@ import { createInvite, deleteInvite, listInvites } from '../invites.ts';
 import { hashPassword } from '../passwords.ts';
 import { deleteUserSessions } from '../sessions.ts';
 import { deleteUserApiTokens } from '../api-tokens.ts';
+import { mcpEnabled, setMcpEnabled } from '../mcp/server.ts';
 import {
   countActiveAdmins,
   findUserById,
@@ -148,6 +149,14 @@ export const adminRoutes: FastifyPluginAsync = async (app) => {
   });
 
   // ── Server settings ──
+  // MCP access for AI agents (with personal tokens); on unless turned off.
+  app.get('/mcp', async () => ({ enabled: mcpEnabled(db) }));
+  app.patch('/mcp', async (req) => {
+    const { enabled } = parse(z.object({ enabled: z.boolean() }), req.body);
+    setMcpEnabled(db, enabled);
+    return { enabled: mcpEnabled(db) };
+  });
+
   app.get('/settings', async () => ({ openSignup: getOpenSignup(db) }));
 
   app.patch('/settings', async (req) => {
