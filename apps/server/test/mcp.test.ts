@@ -86,6 +86,9 @@ test('read tokens only see and run the reading tools', async () => {
   assert.ok(all.length > reading.length);
   assert.ok(reading.every((t) => all.find((a) => a.name === t.name)!.annotations.readOnlyHint));
   assert.ok(all.find((t) => t.name === 'delete_routine')!.annotations.destructiveHint);
+  // Tools that overwrite what's there are flagged too, so clients that confirm destructive calls ask first.
+  for (const name of ['update_exercise', 'update_workout', 'edit_routine']) assert.ok(all.find((t) => t.name === name)!.annotations.destructiveHint, name);
+  assert.equal(all.find((t) => t.name === 'update_targets')!.annotations.destructiveHint, false);
   assert.equal(all.some((t) => t.name === 'delete_session'), false, 'session history can’t be deleted over MCP');
 
   const [msg, isError] = await call('create_exercise', { name: 'Sneaky' }, readToken);

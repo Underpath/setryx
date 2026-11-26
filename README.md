@@ -42,7 +42,7 @@ The exercise library comes from [free-exercise-db](https://github.com/yuhonas/fr
 
 ### Exercise photos (optional)
 
-Photos are off by default, and setryx contacts nothing outside your network until an admin turns them on under **Settings → Exercise photos**. Once on, each photo is downloaded from GitHub the first time someone opens that exercise. Or use **Download all** to fetch every photo up front (about 100 MB). They're kept in `/data/exercise-images`, and **Remove downloaded photos** deletes them again. Your own exercises have no photos.
+Photos are off by default, and setryx contacts nothing outside your network until an admin turns them on under **Settings → Exercise photos**. Once on, each photo is downloaded from GitHub the first time someone opens that exercise. Downloads that redirect, pass 3 MB or aren't JPEGs are refused. Or use **Download all** to fetch every photo up front (about 100 MB). They're kept in `/data/exercise-images`, and **Remove downloaded photos** deletes them again. Your own exercises have no photos.
 
 ### Configuration
 
@@ -141,6 +141,8 @@ A full storage allowance answers 507; deleting still works, and a session logged
 
 Everyone can see where they're signed in under **Settings → Account** and sign out any device.
 
+**Shared devices.** Signing out deletes what your account keeps on that device: an unfinished workout, finished ones waiting to be saved, anything not yet synced, and the offline copy of your workouts. If some of it hasn't reached the server, setryx tries to send it first and asks before deleting what's left. When a session ends without signing out (it expired, you signed it out from another device, or the account was turned off), the offline copy goes, but unsynced workouts stay so they sync when you sign in again. Nobody else signing in on that device sees them.
+
 ### AI agents (MCP)
 
 Agents like Claude can connect to setryx over MCP at `http://<your-server>:38471/mcp`, signing in with an API token. For example, in Claude Code:
@@ -149,7 +151,7 @@ Agents like Claude can connect to setryx over MCP at `http://<your-server>:38471
 claude mcp add --transport http setryx http://<your-server>:38471/mcp --header "Authorization: Bearer setryx_…"
 ```
 
-The agent gets tools to check what's next and your training summary; search exercises and read your history; create and edit workouts, targets and routines; and log a session done without the app. Exercises, workouts and routines can be named instead of given by id. A read-only token only gets the reading tools. Tools that delete are marked so clients ask first, and sessions can't be deleted over MCP. MCP is off by default: an admin turns it on under **Settings → API and AI agents**. The API works with tokens either way.
+The agent gets tools to check what's next and your training summary; search exercises and read your history; create and edit workouts, targets and routines; and log a session done without the app. Exercises, workouts and routines can be named instead of given by id. A read-only token only gets the reading tools. Tools that delete or overwrite (updating an exercise or a workout, editing a routine) are marked so clients ask first, and sessions can't be deleted over MCP. MCP is off by default: an admin turns it on under **Settings → API and AI agents**. The API works with tokens either way.
 
 ### Locked out?
 
@@ -161,7 +163,7 @@ docker exec -it setryx list-users
 docker exec -it setryx reset-password <username>
 ```
 
-This also turns the account back on, signs it out everywhere and revokes its API tokens.
+The new password isn't shown as you type it, and you type it twice. It needs `-it` so there's a terminal to type into. This also turns the account back on, signs it out everywhere and revokes its API tokens.
 
 ## Develop
 

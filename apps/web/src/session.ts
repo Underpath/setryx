@@ -3,6 +3,12 @@ import { useNavigate } from 'react-router';
 import { useEffect } from 'react';
 import type { PublicUser } from '@setryx/shared';
 import { api, ApiRequestError } from './api.ts';
+import { forgetAccountOnDevice } from './sync/outbox.ts';
+
+/** The offline copy of workouts and routines; it belongs to whoever was signed in. */
+const dropApiCache = () => {
+  if ('caches' in window) void caches.delete('setryx-api').catch(() => {});
+};
 
 export function useSetupStatus() {
   return useQuery({ queryKey: ['setup'], queryFn: () => api.get<{ needsSetup: boolean }>('/setup'), staleTime: Infinity });
@@ -10,13 +16,24 @@ export function useSetupStatus() {
 
 /** The signed-in user, or null when signed out. */
 export function useMe() {
+  const qc = useQueryClient();
   return useQuery({
     queryKey: ['me'],
     queryFn: async () => {
       try {
         return (await api.get<{ user: PublicUser }>('/auth/me')).user;
       } catch (err) {
-        if (err instanceof ApiRequestError && err.status === 401) return null;
+        if (err instanceof ApiRequestError && err.status === 401) {
+          // The session ended without signing out (it expired, was signed out
+          // elsewhere, or the account was turned off). Drop copies of the
+          // account's data, but keep its unsynced workouts: they're kept under
+          // its id, nobody else sees them, and they sync when it signs in again.
+          if (qc.getQueryData(['me'])) {
+            qc.removeQueries({ predicate: (q) => q.queryKey[0] !== 'me' && q.queryKey[0] !== 'setup' });
+            dropApiCache();
+          }
+          return null;
+        }
         throw err;
       }
     },
@@ -42,8 +59,8 @@ export function useThemeFromSettings(user: PublicUser | null | undefined) {
   }, [theme]);
 }
 
-/** Signs out and drops everything this account left on the device. */
-export function useLogout() {
+/** Signs out and drops everything this account left on the device, unsynced workouts included (see SignOut.tsx). */
+export function useLogout(userId: string) {
   const qc = useQueryClient();
   const setMe = useSetMe();
   const navigate = useNavigate();
@@ -51,8 +68,8 @@ export function useLogout() {
     mutationFn: () => api.post('/auth/logout'),
     onSettled: () => {
       qc.clear();
-      // Offline copies of workouts belong to this account; drop them on sign-out.
-      if ('caches' in window) void caches.delete('setryx-api').catch(() => {});
+      forgetAccountOnDevice(userId);
+      dropApiCache();
       setMe(null);
       navigate('/login', { replace: true });
     },

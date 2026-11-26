@@ -496,6 +496,7 @@ export const TOOLS: Tool[] = [
     title: 'Update an exercise',
     description: 'Change one of your own exercises. Fields left out stay as they are. Library exercises can’t be changed.',
     write: true,
+    destructive: true,
     idempotent: true,
     input: z.object({
       exercise: ref('Exercise'),
@@ -549,6 +550,7 @@ export const TOOLS: Tool[] = [
     description:
       'Rename a workout, change its notes, or replace its steps. To edit steps, get_workout first and pass back the edited items, keeping their ids. For small target changes, update_targets is simpler.',
     write: true,
+    destructive: true,
     idempotent: true,
     input: z.object({ workout: ref('Workout'), name: text(80).min(1).optional(), icon: text(16).optional(), notes: text(2000).nullable().optional(), items: itemsIn.optional() }),
     async run(ctx, a) {
@@ -654,6 +656,7 @@ export const TOOLS: Tool[] = [
     description:
       'Rename a routine, change its mode, or give its new list of workouts. Workouts that stay keep their place, so a rotation carries on where it was; only new ones start fresh.',
     write: true,
+    destructive: true,
     idempotent: true,
     input: z.object({ routine: ref('Routine'), name: text(80).min(1).optional(), mode: z.enum(['repeat', 'once', 'weekly']).optional(), workouts: routineWorkoutsIn.optional() }),
     async run(ctx, a) {

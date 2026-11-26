@@ -3,7 +3,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, NavLink, Navigate, Outlet, useNavigate, useParams } from 'react-router';
 import { type BackupFile, type BackupSettings, type PublicUser, type SignInSession, type UpdateMeRequest, type UserSettings, WEEKDAYS } from '@setryx/shared';
 import { api } from '../api.ts';
-import { useLogout, useMe, useSetMe } from '../session.ts';
+import { useMe, useSetMe } from '../session.ts';
+import { useSignOut } from '../components/SignOut.tsx';
 import { Field, FormError, Icon, Sheet, Switch, fieldErrors, useToast } from '../components/ui.tsx';
 import { ago, deviceName, useMediaQuery } from '../util.ts';
 import { InvitesSection, UsersSection } from './AdminPage.tsx';
@@ -46,7 +47,7 @@ export function SettingsLayout() {
   const { section } = useParams();
   const wide = useMediaQuery(WIDE);
   const navigate = useNavigate();
-  const logout = useLogout();
+  const signOut = useSignOut(user);
   const sections = SECTIONS.filter((x) => !x.admin || user.role === 'admin');
   const current = sections.find((x) => x.id === section);
 
@@ -76,7 +77,7 @@ export function SettingsLayout() {
                 <span className="meta">{x.hint}</span>
               </NavLink>
             ))}
-            <button className="settings-tab signout" type="button" onClick={() => logout.mutate()} disabled={logout.isPending}>
+            <button className="settings-tab signout" type="button" onClick={signOut.start} disabled={signOut.pending}>
               <span className="name">Sign out</span>
               <span className="meta">Signed in as {user.username}</span>
             </button>
@@ -89,6 +90,7 @@ export function SettingsLayout() {
           </div>
         )}
       </div>
+      {signOut.sheet}
     </main>
   );
 }

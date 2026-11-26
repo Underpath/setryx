@@ -1,7 +1,6 @@
 // Admin command line, for when nobody can sign in.
 //   docker exec -it setryx reset-password <username>
 //   docker exec -it setryx list-users
-import { createInterface } from 'node:readline/promises';
 import { passwordSchema } from '@setryx/shared';
 import { loadConfig } from './config.ts';
 import { openDb } from './db.ts';
@@ -13,13 +12,50 @@ import { findUserByUsername, listUsers, setPassword, updateUser } from './users.
 const [command, username] = process.argv.slice(2);
 const db = openDb(loadConfig().dataDir);
 
-async function ask(question: string): Promise<string> {
-  const rl = createInterface({ input: process.stdin, output: process.stdout });
-  try {
-    return await rl.question(question);
-  } finally {
-    rl.close();
+/** Asks for a password without showing it. Null when there's no terminal to type into. */
+function askHidden(question: string): Promise<string | null> {
+  const { stdin, stdout } = process;
+  if (!stdin.isTTY) return Promise.resolve(null);
+  stdout.write(question);
+  stdin.setRawMode(true);
+  stdin.setEncoding('utf8');
+  stdin.resume();
+  return new Promise((resolve) => {
+    let typed = '';
+    const done = (value: string | null) => {
+      stdin.off('data', onData);
+      stdin.setRawMode(false);
+      stdin.pause();
+      stdout.write('\n');
+      resolve(value);
+    };
+    const onData = (chunk: string) => {
+      for (const ch of chunk) {
+        if (ch === '\r' || ch === '\n') return done(typed);
+        if (ch === '\u0003' || ch === '\u0004') return done(null); // Ctrl-C, Ctrl-D
+        if (ch === '\u007f' || ch === '\b') typed = typed.slice(0, -1);
+        else if (ch >= ' ') typed += ch;
+      }
+    };
+    stdin.on('data', onData);
+  });
+}
+
+/** The new password: from NEW_PASSWORD, or typed twice without being shown. */
+async function newPassword(username: string): Promise<string | null> {
+  if (process.env.NEW_PASSWORD) return process.env.NEW_PASSWORD;
+  const first = await askHidden(`New password for ${username} (not shown): `);
+  if (first === null) {
+    console.error('Nothing to type the password into. Run it with a terminal: docker exec -it setryx reset-password <username>');
+    return null;
   }
+  const again = await askHidden('Type it again: ');
+  if (again === null) return null;
+  if (first !== again) {
+    console.error('The two passwords don’t match. Nothing was changed.');
+    return null;
+  }
+  return first;
 }
 
 async function main(): Promise<number> {
@@ -40,7 +76,8 @@ async function main(): Promise<number> {
         console.error(`No user called "${username}". Run list-users to see who exists.`);
         return 1;
       }
-      const password = process.env.NEW_PASSWORD ?? (await ask(`New password for ${user.username}: `));
+      const password = await newPassword(user.username);
+      if (password === null) return 1;
       const check = passwordSchema.safeParse(password);
       if (!check.success) {
         console.error(check.error.issues[0]?.message ?? 'Invalid password.');

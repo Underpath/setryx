@@ -3,7 +3,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useLocation } from 'react-router';
 import { type PlayerState, type RoutineRun, type SessionUpload, type TargetUpdates, sessionUploadOf } from '@setryx/shared';
 import { api, ApiRequestError } from '../api.ts';
-import { loadFinished, removeFinished } from '../player/storage.ts';
+import { announce, clearActive, loadActive, loadFinished, removeFinished, write as writeStored } from '../player/storage.ts';
 
 // Things the device has to tell the server, kept on the device until the
 // server confirms them. Uploads are idempotent (sessions have a fixed id), so
@@ -168,4 +168,27 @@ export function SyncRunner({ userId }: { userId: string }) {
   }, [userId, pending, qc]);
 
   return null;
+}
+
+/** What this account has on this device that the server doesn't have yet, as lines to show. */
+export function unsyncedOnDevice(userId: string): string[] {
+  const lines: string[] = [];
+  if (loadActive(userId)) lines.push('A workout you haven’t finished');
+  const finished = loadFinished(userId).length;
+  if (finished) lines.push(finished === 1 ? 'A finished workout you haven’t saved' : `${finished} finished workouts you haven’t saved`);
+  const items = readOutbox(userId);
+  const sessions = items.filter((i) => i.kind === 'session').length;
+  const targets = items.length - sessions;
+  if (sessions) lines.push(sessions === 1 ? 'A saved workout that hasn’t reached the server' : `${sessions} saved workouts that haven’t reached the server`);
+  if (targets) lines.push(targets === 1 ? 'A change to a workout’s targets' : `${targets} changes to workouts’ targets`);
+  return lines;
+}
+
+/** Drops everything this account keeps on this device: the running workout, finished ones, review ticks and the outbox. */
+export function forgetAccountOnDevice(userId: string): void {
+  for (const s of [loadActive(userId), ...loadFinished(userId)]) if (s) writeStored(`setryx.review.ticks.${s.id}`, null);
+  for (const s of loadFinished(userId)) removeFinished(userId, s.id);
+  clearActive(userId);
+  writeOutbox(userId, []);
+  announce();
 }

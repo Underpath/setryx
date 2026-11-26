@@ -61,6 +61,7 @@ a { color: var(--blue-text); }
 .btn-primary { background: var(--blue); color: #fff; }
 .btn-quiet { border: 1.5px solid var(--rule); }
 .btn-danger { color: var(--red-text); }
+.unsynced-list { margin: 8px 0 12px; padding-left: 1.2em; display: grid; gap: 4px; }
 .btn-strong { background: color-mix(in srgb, var(--fg) 10%, transparent); border: 2px solid var(--fg); }
 .btn-strong:hover:not(:disabled) { background: color-mix(in srgb, var(--fg) 18%, transparent); }
 .btn-quiet.btn-danger { border-color: color-mix(in srgb, var(--red-text) 60%, transparent); }

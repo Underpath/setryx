@@ -1,7 +1,7 @@
 import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { Link, NavLink, Outlet, useLocation } from 'react-router';
 import type { PublicUser } from '@setryx/shared';
-import { useLogout } from '../session.ts';
+import { useSignOut } from './SignOut.tsx';
 import { Icon } from './ui.tsx';
 
 const tabs = [
@@ -20,7 +20,7 @@ export function initials(user: PublicUser): string {
 export function AvatarMenu({ user, placement = 'below' }: { user: PublicUser; placement?: 'below' | 'beside' }) {
   const [open, setOpen] = useState(false);
   const wrap = useRef<HTMLDivElement>(null);
-  const logout = useLogout();
+  const signOut = useSignOut(user);
   const { pathname } = useLocation();
 
   useEffect(() => setOpen(false), [pathname]);
@@ -48,9 +48,10 @@ export function AvatarMenu({ user, placement = 'below' }: { user: PublicUser; pl
             <span>{user.username}</span>
           </div>
           <Link role="menuitem" className="am-item" to="/settings">Settings</Link>
-          <button role="menuitem" className="am-item" type="button" onClick={() => logout.mutate()} disabled={logout.isPending}>Sign out</button>
+          <button role="menuitem" className="am-item" type="button" onClick={() => (setOpen(false), signOut.start())} disabled={signOut.pending}>Sign out</button>
         </div>
       )}
+      {signOut.sheet}
     </div>
   );
 }

@@ -53,19 +53,38 @@ async function exists(file: string): Promise<boolean> {
 
 const inFlight = new Map<string, Promise<boolean>>();
 
-/** Downloads one photo into the data folder. True when it's there afterwards. */
-export function fetchImage(dataDir: string, path: string): Promise<boolean> {
+/** Reads a response body, giving up as soon as it passes `max` bytes. */
+async function readCapped(res: Response, max: number): Promise<Buffer | null> {
+  const declared = Number(res.headers.get('content-length'));
+  if (declared > max) return null;
+  if (!res.body) return null;
+  const parts: Uint8Array[] = [];
+  let size = 0;
+  for await (const chunk of res.body as unknown as AsyncIterable<Uint8Array>) {
+    size += chunk.length;
+    if (size > max) return null; // leaving the loop cancels the download
+    parts.push(chunk);
+  }
+  return Buffer.concat(parts);
+}
+
+/** Every JPEG starts with these three bytes. */
+const isJpeg = (b: Buffer) => b.length > 3 && b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff;
+
+/**
+ * Downloads one photo into the data folder. True when it's there afterwards.
+ * The source is trusted only so far: no redirects, at most MAX_BYTES, and it must be a JPEG.
+ */
+export function fetchImage(dataDir: string, path: string, source = IMAGE_SOURCE): Promise<boolean> {
   const pending = inFlight.get(path);
   if (pending) return pending;
   const p = (async () => {
     const file = join(imagesDir(dataDir), path);
     if (await exists(file)) return true;
-    const res = await fetch(IMAGE_SOURCE + path.split('/').map(encodeURIComponent).join('/'), { signal: AbortSignal.timeout(20_000) });
+    const res = await fetch(source + path.split('/').map(encodeURIComponent).join('/'), { signal: AbortSignal.timeout(20_000), redirect: 'error' });
     if (!res.ok) return false;
-    const type = res.headers.get('content-type') ?? '';
-    if (!type.startsWith('image/')) return false;
-    const buf = Buffer.from(await res.arrayBuffer());
-    if (buf.length === 0 || buf.length > MAX_BYTES) return false;
+    const buf = await readCapped(res, MAX_BYTES);
+    if (!buf || !isJpeg(buf)) return false;
     await mkdir(join(file, '..'), { recursive: true });
     const tmp = `${file}.${process.pid}.tmp`;
     await writeFile(tmp, buf);

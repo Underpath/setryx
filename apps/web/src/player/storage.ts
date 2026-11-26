@@ -16,7 +16,7 @@ function read<T>(key: string): T | null {
   }
 }
 
-function write(key: string, value: unknown): boolean {
+export function write(key: string, value: unknown): boolean {
   try {
     if (value === null) localStorage.removeItem(key);
     else localStorage.setItem(key, JSON.stringify(value));
