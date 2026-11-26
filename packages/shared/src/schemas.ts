@@ -79,6 +79,8 @@ export type UpdateMeRequest = z.infer<typeof updateMeRequestSchema>;
 export const changePasswordRequestSchema = z.object({
   currentPassword: z.string().min(1).max(256),
   newPassword: passwordSchema,
+  /** Also revoke the person's API tokens; the app ticks this by default. */
+  revokeTokens: z.boolean().default(true),
 });
 export type ChangePasswordRequest = z.infer<typeof changePasswordRequestSchema>;
 
@@ -150,9 +152,22 @@ export const limitSettingsSchema = z.object({
   signInPerMinute: wholeNumber(3, 100),
   /** Tokens each person may have at once. */
   maxTokensPerUser: wholeNumber(1, 100),
+  /** Signed out after this many days without using setryx. */
+  sessionIdleDays: wholeNumber(1, 365),
+  /** Signed out this many days after signing in, however active; null: never. */
+  sessionMaxDays: wholeNumber(1, 3650).nullable(),
+  /** Devices each person may be signed in on; the longest unused is signed out past it. */
+  maxSessionsPerUser: wholeNumber(1, 100),
+  /** Storage each person's workouts, routines, exercises and sessions may take, in MB; null: no limit. */
+  storageMbPerUser: wholeNumber(1, 100000).nullable(),
 });
 export type LimitSettings = z.infer<typeof limitSettingsSchema>;
-export const defaultLimitSettings: LimitSettings = { tokenPerMinute: 120, signInPerMinute: 10, maxTokensPerUser: 5 };
+export const defaultLimitSettings: LimitSettings = { tokenPerMinute: 120, signInPerMinute: 10, maxTokensPerUser: 5,
+  sessionIdleDays: 30, sessionMaxDays: 90, maxSessionsPerUser: 20, storageMbPerUser: 100,
+};
+
+/** One place someone is signed in, as listed in their account settings. */
+export type SignInSession = { id: string; userAgent: string | null; createdAt: string; lastUsedAt: string; current: boolean };
 
 // ── API tokens ────────────────────────────────────────────
 
@@ -165,6 +180,8 @@ export const createApiTokenRequestSchema = z.object({
   scope: apiTokenScopeSchema,
   /** Null: never expires. */
   expiresInDays: z.union([z.literal(30), z.literal(90), z.literal(365)]).nullable(),
+  /** The person's password, to confirm it's them and not someone with their open session. */
+  password: z.string().min(1, 'Enter your password.').max(256),
 });
 export type CreateApiTokenRequest = z.infer<typeof createApiTokenRequestSchema>;
 

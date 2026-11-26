@@ -1,11 +1,11 @@
 import { type FormEvent, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, NavLink, Navigate, Outlet, useNavigate, useParams } from 'react-router';
-import { type BackupFile, type BackupSettings, type PublicUser, type UpdateMeRequest, type UserSettings, WEEKDAYS } from '@setryx/shared';
+import { type BackupFile, type BackupSettings, type PublicUser, type SignInSession, type UpdateMeRequest, type UserSettings, WEEKDAYS } from '@setryx/shared';
 import { api } from '../api.ts';
 import { useLogout, useMe, useSetMe } from '../session.ts';
 import { Field, FormError, Icon, Sheet, Switch, fieldErrors, useToast } from '../components/ui.tsx';
-import { useMediaQuery } from '../util.ts';
+import { ago, deviceName, useMediaQuery } from '../util.ts';
 import { InvitesSection, UsersSection } from './AdminPage.tsx';
 import { ApiTokensSection } from './ApiTokensSection.tsx';
 import { LimitsSection } from './LimitsSection.tsx';
@@ -19,7 +19,7 @@ const SECTIONS: { id: SectionId; label: string; hint: string; admin?: boolean }[
   { id: 'api', label: 'API and AI agents', hint: 'Tokens, MCP' },
   { id: 'people', label: 'People and invites', hint: 'Accounts on this server', admin: true },
   { id: 'photos', label: 'Exercise photos', hint: 'Allow, download or remove', admin: true },
-  { id: 'limits', label: 'Limits', hint: 'Sign-in attempts, API and MCP', admin: true },
+  { id: 'limits', label: 'Limits', hint: 'Sign-ins, API, storage', admin: true },
   { id: 'backups', label: 'Backups', hint: 'Database copies for your volume backups', admin: true },
 ];
 const WIDE = '(min-width: 760px)';
@@ -346,6 +346,7 @@ function AccountSection({ user }: { user: PublicUser }) {
           <button className="btn btn-quiet btn-sm" type="button" onClick={() => setEditing('password')}>Change password</button>
         </li>
       </ul>
+      <SignInsSection />
       {editing === 'name' && <NameSheet user={user} onClose={() => setEditing(null)} />}
       {editing === 'password' && <PasswordSheet onClose={() => setEditing(null)} />}
     </>
@@ -440,12 +441,52 @@ function NameSheet({ user, onClose }: { user: PublicUser; onClose: () => void })
   );
 }
 
+/** Where you're signed in, with a way to sign out of each. */
+function SignInsSection() {
+  const qc = useQueryClient();
+  const toast = useToast();
+  const list = useQuery({ queryKey: ['my-sessions'], queryFn: () => api.get<{ sessions: SignInSession[] }>('/me/sessions') });
+  const done = (message: string) => () => (toast(message), qc.invalidateQueries({ queryKey: ['my-sessions'] }));
+  const end = useMutation({ mutationFn: (id: string) => api.del(`/me/sessions/${id}`), onSuccess: done('Signed out on that device'), onError: (e) => toast(e.message) });
+  const endOthers = useMutation({ mutationFn: () => api.del('/me/sessions'), onSuccess: done('Signed out on your other devices'), onError: (e) => toast(e.message) });
+  const others = list.data?.sessions.filter((x) => !x.current) ?? [];
+  return (
+    <section className="section">
+      <div className="section-head">
+        <h2 className="h3">Where you’re signed in</h2>
+        {others.length > 0 && (
+          <button className="btn btn-quiet btn-sm" type="button" disabled={endOthers.isPending} onClick={() => endOthers.mutate()}>Sign out everywhere else</button>
+        )}
+      </div>
+      <FormError error={list.error} />
+      <ul className="rows">
+        {list.data?.sessions.map((x) => (
+          <li className="row" key={x.id}>
+            <div className="main">
+              <div className="name">{deviceName(x.userAgent)}{x.current && <> <span className="tag">This device</span></>}</div>
+              <div className="meta">{x.current ? 'In use now' : `Last used ${ago(x.lastUsedAt)}`}. Signed in {ago(x.createdAt)}.</div>
+            </div>
+            {!x.current && (
+              <button className="btn btn-quiet btn-danger btn-sm" type="button" disabled={end.isPending} onClick={() => end.mutate(x.id)}>Sign out</button>
+            )}
+          </li>
+        ))}
+      </ul>
+      <p className="small muted" style={{ marginTop: 10 }}>Don’t recognise one? Sign it out and change your password.</p>
+    </section>
+  );
+}
+
 function PasswordSheet({ onClose }: { onClose: () => void }) {
   const toast = useToast();
+  const qc = useQueryClient();
+  const [revokeTokens, setRevokeTokens] = useState(true);
   const m = useMutation({
-    mutationFn: (body: Record<string, string>) => api.post('/me/password', body),
+    mutationFn: (body: Record<string, string>) => api.post('/me/password', { ...body, revokeTokens }),
     onSuccess: () => {
-      toast('Password changed');
+      toast(revokeTokens ? 'Password changed and API tokens revoked' : 'Password changed');
+      qc.invalidateQueries({ queryKey: ['tokens'] });
+      qc.invalidateQueries({ queryKey: ['my-sessions'] });
       onClose();
     },
   });
@@ -455,6 +496,15 @@ function PasswordSheet({ onClose }: { onClose: () => void }) {
       <form className="form" onSubmit={(e: FormEvent<HTMLFormElement>) => (e.preventDefault(), m.mutate(Object.fromEntries(new FormData(e.currentTarget)) as Record<string, string>))}>
         <Field label="Current password" name="currentPassword" type="password" autoComplete="current-password" error={fields.currentPassword} />
         <Field label="New password" name="newPassword" type="password" autoComplete="new-password" error={fields.newPassword} hint="At least 10 characters." />
+        <div className="field">
+          <label className="check">
+            <input type="checkbox" checked={revokeTokens} onChange={(e) => setRevokeTokens(e.target.checked)} aria-describedby="revoke-hint" /> Also revoke my API tokens
+          </label>
+          <div className="hint" id="revoke-hint">
+            Recommended if you think someone else got in: they could have made a token. Scripts and agents using your tokens stop working until you make new ones.
+            You’ll be signed out on your other devices either way.
+          </div>
+        </div>
         <FormError error={general} />
         <button className="btn btn-primary btn-block" type="submit" disabled={m.isPending}>Change password</button>
       </form>

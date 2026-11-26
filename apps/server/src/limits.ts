@@ -55,6 +55,11 @@ export class RateLimiter {
     return { ok: true, remaining: Math.floor(left - cost) };
   }
 
+  /** Gives back what `take` took, e.g. when the attempt turned out fine. */
+  refund(key: string, perMinute: number, cost = 1, now = Date.now()): void {
+    this.buckets.set(key, { left: Math.min(perMinute, this.left(key, perMinute, now) + cost), at: now });
+  }
+
   /** Whether `cost` could be taken now, without taking it. */
   peek(key: string, perMinute: number, cost = 1, now = Date.now()): Taken {
     const left = this.left(key, perMinute, now);

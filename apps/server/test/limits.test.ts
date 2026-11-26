@@ -21,7 +21,7 @@ const setLimits = async (patch: Partial<LimitSettings>) => {
   const res = await asUser('PUT', '/api/v1/admin/limits', { ...defaultLimitSettings, ...patch });
   assert.equal(res.statusCode, 200, res.body);
 };
-const newToken = async () => (await asUser('POST', '/api/v1/tokens', { name: 'agent', scope: 'write', expiresInDays: null })).json().secret as string;
+const newToken = async () => (await asUser('POST', '/api/v1/tokens', { name: 'agent', scope: 'write', expiresInDays: null , password: 'owner password 1' })).json().secret as string;
 
 beforeEach(async () => {
   const dir = mkdtempSync(join(tmpdir(), 'setryx-test-'));
@@ -132,7 +132,7 @@ test('wrong current passwords count against the account’s sign-in limit', asyn
 test('token count is capped', async () => {
   await setLimits({ maxTokensPerUser: 1 });
   await newToken();
-  const second = await asUser('POST', '/api/v1/tokens', { name: 'two', scope: 'read', expiresInDays: 30 });
+  const second = await asUser('POST', '/api/v1/tokens', { name: 'two', scope: 'read', expiresInDays: 30 , password: 'owner password 1' });
   assert.equal(second.statusCode, 400);
   assert.equal(second.json().error, 'too_many_tokens');
   assert.match(second.json().message, /You have a token, the most this server allows/);

@@ -19,7 +19,7 @@ const asUser = (method: Method, url: string, body?: object) => app.inject({ meth
 const withToken = (token: string, method: Method, url: string, body?: object) =>
   app.inject({ method, url, payload: body, headers: { authorization: `Bearer ${token}` } });
 const newToken = async (scope: 'read' | 'write', expiresInDays: 30 | null = null) => {
-  const res = await asUser('POST', '/api/v1/tokens', { name: `${scope} token`, scope, expiresInDays });
+  const res = await asUser('POST', '/api/v1/tokens', { name: `${scope} token`, scope, expiresInDays , password: 'owner password 1' });
   assert.equal(res.statusCode, 201);
   return res.json() as { token: { id: string; hint: string; scope: string }; secret: string };
 };
@@ -127,7 +127,7 @@ test('no token reaches account, admin, token, import or photo endpoints', async 
     ['POST', '/api/v1/me/password', { currentPassword: 'x', newPassword: 'another password 1' }],
     ['POST', '/api/v1/auth/logout'],
     ['GET', '/api/v1/tokens'],
-    ['POST', '/api/v1/tokens', { name: 'more', scope: 'write', expiresInDays: null }],
+    ['POST', '/api/v1/tokens', { name: 'more', scope: 'write', expiresInDays: null , password: 'owner password 1' }],
     ['GET', '/api/v1/admin/users'],
     ['PATCH', '/api/v1/admin/exercise-images', { allowed: true }],
     ['PUT', '/api/v1/admin/backups', { dir: '/tmp', keep: 3, latestEveryMinutes: 15 }],
@@ -158,16 +158,21 @@ test('tokens stop working when the account is disabled or an admin resets the pa
   const friendId = other.json().user.id;
   const friendCookie = cookieOf(await app.inject({ method: 'POST', url: '/api/v1/auth/login', payload: { username: 'friend', password: 'friend password 1' } }));
   const make = async () =>
-    (await app.inject({ method: 'POST', url: '/api/v1/tokens', payload: { name: 'f', scope: 'read', expiresInDays: null }, headers: { cookie: friendCookie } })).json().secret as string;
+    (await app.inject({ method: 'POST', url: '/api/v1/tokens', payload: { name: 'f', scope: 'read', expiresInDays: null , password: 'friend password 1' }, headers: { cookie: friendCookie } })).json().secret as string;
 
   const first = await make();
   await asUser('PATCH', `/api/v1/admin/users/${friendId}`, { disabled: true });
   assert.equal((await withToken(first, 'GET', '/api/v1/workouts')).statusCode, 401);
   await asUser('PATCH', `/api/v1/admin/users/${friendId}`, { disabled: false });
-  assert.equal((await withToken(first, 'GET', '/api/v1/workouts')).statusCode, 200, 'back on: the token works again');
+  assert.equal((await withToken(first, 'GET', '/api/v1/workouts')).statusCode, 401, 'turning the account off deleted the token for good');
+  const friendBack = cookieOf(await app.inject({ method: 'POST', url: '/api/v1/auth/login', payload: { username: 'friend', password: 'friend password 1' } }));
+  assert.equal((await app.inject({ method: 'GET', url: '/api/v1/tokens', headers: { cookie: friendBack } })).json().tokens.length, 0);
 
+  const second = (
+    await app.inject({ method: 'POST', url: '/api/v1/tokens', payload: { name: 'g', scope: 'read', expiresInDays: null, password: 'friend password 1' }, headers: { cookie: friendBack } })
+  ).json().secret as string;
   await asUser('POST', `/api/v1/admin/users/${friendId}/password`, { password: 'reset password 1' });
-  assert.equal((await withToken(first, 'GET', '/api/v1/workouts')).statusCode, 401);
+  assert.equal((await withToken(second, 'GET', '/api/v1/workouts')).statusCode, 401);
 });
 
 test('each person only sees their own data through a token', async () => {
@@ -176,7 +181,7 @@ test('each person only sees their own data through a token', async () => {
   const wId = (await asUser('POST', '/api/v1/workouts', workout(ex))).json().workout.id;
   await asUser('POST', '/api/v1/admin/users', { username: 'friend', displayName: 'Friend', password: 'friend password 1' });
   const friendCookie = cookieOf(await app.inject({ method: 'POST', url: '/api/v1/auth/login', payload: { username: 'friend', password: 'friend password 1' } }));
-  const friendToken = (await app.inject({ method: 'POST', url: '/api/v1/tokens', payload: { name: 'f', scope: 'write', expiresInDays: null }, headers: { cookie: friendCookie } })).json().secret;
+  const friendToken = (await app.inject({ method: 'POST', url: '/api/v1/tokens', payload: { name: 'f', scope: 'write', expiresInDays: null , password: 'friend password 1' }, headers: { cookie: friendCookie } })).json().secret;
   assert.equal((await withToken(friendToken, 'GET', `/api/v1/workouts/${wId}`)).statusCode, 404);
   assert.equal((await withToken(friendToken, 'DELETE', `/api/v1/workouts/${wId}`)).statusCode, 404);
   assert.equal((await withToken(friendToken, 'GET', '/api/v1/workouts')).json().workouts.length, 0);

@@ -13,6 +13,12 @@ app.backups.start();
 const purgeTimer = setInterval(() => purgeExpiredSessions(db), 6 * 3_600_000);
 purgeTimer.unref();
 
+if (!config.allowedHosts) {
+  app.log.warn('Neither BASE_URL nor ALLOWED_HOSTS is set, so any host name is accepted. Set one to block DNS-rebinding pages.');
+}
+if (config.baseUrl?.startsWith('https://') && config.cookieSecure === 'false') {
+  app.log.warn('BASE_URL is https:// but COOKIE_SECURE=false, so the session cookie is sent without Secure.');
+}
 if (!config.webDist) app.log.warn('No built web app found; serving the API only. Run `npm run build` first.');
 
 await app.listen({ port: config.port, host: config.host });

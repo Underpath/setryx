@@ -95,9 +95,17 @@ export function replaceWorkout(db: DB, userId: string, id: string, f: WorkoutFie
   return getWorkout(db, userId, id);
 }
 
-/** Soft delete, so past sessions (M4+) keep their link. */
+/**
+ * Soft delete, so past sessions keep their link. Nothing reads a deleted
+ * workout's steps or notes (sessions keep their own copy), so those go and
+ * the space counts as freed.
+ */
 export function archiveWorkout(db: DB, userId: string, id: string): boolean {
-  return db.prepare('UPDATE workouts SET archived = 1, updated_at = ? WHERE id = ? AND user_id = ? AND archived = 0').run(now(), id, userId).changes > 0;
+  return tx(db, () => {
+    const done = db.prepare('UPDATE workouts SET archived = 1, notes = NULL, updated_at = ? WHERE id = ? AND user_id = ? AND archived = 0').run(now(), id, userId).changes > 0;
+    if (done) db.prepare('DELETE FROM workout_items WHERE workout_id = ?').run(id);
+    return done;
+  });
 }
 
 /** Gives every step a fresh id (used when copying). */

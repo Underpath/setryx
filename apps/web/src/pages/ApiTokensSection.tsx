@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { ApiToken, ApiTokenScope, CreateApiTokenRequest, PublicUser } from '@setryx/shared';
 import { Link } from 'react-router';
 import { api } from '../api.ts';
+import { ago } from '../util.ts';
 import { Field, FormError, Icon, Sheet, Switch, fieldErrors, useToast } from '../components/ui.tsx';
 
 const dateFmt = new Intl.DateTimeFormat(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
@@ -15,11 +16,7 @@ const EXPIRY: { v: CreateApiTokenRequest['expiresInDays']; label: string }[] = [
 ];
 
 const metaOf = (t: ApiToken) =>
-  [
-    SCOPE_LABEL[t.scope],
-    t.lastUsedAt ? `Last used ${dateFmt.format(new Date(t.lastUsedAt))}` : 'Not used yet',
-    t.expiresAt ? `Expires ${dateFmt.format(new Date(t.expiresAt))}` : 'Doesn’t expire',
-  ].join('. ') + '.';
+  [SCOPE_LABEL[t.scope], `Made ${dateFmt.format(new Date(t.createdAt))}`, t.expiresAt ? `Expires ${dateFmt.format(new Date(t.expiresAt))}` : 'Doesn’t expire'].join('. ') + '.';
 
 const limitsText = ({ perMinute, maxTokens }: { perMinute: number | null; maxTokens: number }) =>
   `You can have up to ${maxTokens === 1 ? 'one token' : `${maxTokens} tokens`}. ${
@@ -62,7 +59,11 @@ export function ApiTokensSection({ user }: { user: PublicUser }) {
           {tokens.data?.tokens.length === 0 && <li className="row"><span className="muted">No tokens yet.</span></li>}
           {tokens.data?.tokens.map((t) => (
             <li className="row" key={t.id}>
-              <div className="main"><div className="name">{t.name} <span className="token-hint">{t.hint}</span></div><div className="meta">{metaOf(t)}</div></div>
+              <div className="main">
+                <div className="name">{t.name} <span className="token-hint">{t.hint}</span></div>
+                <div className="token-used">{t.lastUsedAt ? `Last used ${ago(t.lastUsedAt)}` : 'Never used'}</div>
+                <div className="meta">{metaOf(t)}</div>
+              </div>
               <button className="btn btn-quiet btn-danger btn-sm" type="button" onClick={() => setRevoking(t)}>Revoke</button>
             </li>
           ))}
@@ -110,7 +111,8 @@ function NewTokenSheet({ onClose, onCreated }: { onClose: () => void; onCreated:
   const { fields, general } = fieldErrors(m.error);
   const submit = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    m.mutate({ name: String(new FormData(e.currentTarget).get('name') ?? ''), scope, expiresInDays: expires });
+    const form = new FormData(e.currentTarget);
+    m.mutate({ name: String(form.get('name') ?? ''), scope, expiresInDays: expires, password: String(form.get('password') ?? '') });
   };
   return (
     <Sheet title="New API token" onClose={onClose}>
@@ -137,6 +139,7 @@ function NewTokenSheet({ onClose, onCreated }: { onClose: () => void; onCreated:
             ))}
           </div>
         </div>
+        <Field label="Your password" name="password" type="password" autoComplete="current-password" error={fields.password} hint="A token keeps working after you sign out, so setryx checks it’s you." />
         <FormError error={general} />
         <button className="btn btn-primary btn-block" type="submit" disabled={m.isPending}>Create token</button>
       </form>

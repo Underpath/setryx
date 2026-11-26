@@ -50,11 +50,14 @@ Photos are off by default, and setryx contacts nothing outside your network unti
 |---|---|---|---|
 | `PORT` | compose | `38471` | Port the server listens on |
 | `TRUST_PROXY` | compose | `false` | Set `true` behind a reverse proxy, so HTTPS and client IPs are detected |
-| `COOKIE_SECURE` | compose | `auto` | `auto` marks cookies Secure when the proxy reports HTTPS; or `true` / `false` |
-| `BASE_URL` | compose | (unset) | Public address used in invite links, e.g. `https://setryx.example.com` |
+| `COOKIE_SECURE` | compose | `auto` | `auto` marks cookies Secure when the proxy reports HTTPS or `BASE_URL` is `https://`; or `true` / `false` |
+| `BASE_URL` | compose | (unset) | Public address, e.g. `https://setryx.example.com`. Used in invite links, and the server only answers to its host (plus `ALLOWED_HOSTS`) |
+| `ALLOWED_HOSTS` | compose | (unset) | More names or addresses the server answers to, comma separated, e.g. `192.168.1.5,setryx.lan`. A name without a port matches any port |
 | `SESSION_SECRET` | `stack.env` | generated | Signs session cookies; at least 32 characters |
 
 Secrets go only in `stack.env`, which git ignores.
+
+Set `BASE_URL` or `ALLOWED_HOSTS`. Then setryx turns away requests for any other host name, which stops a malicious web page from reaching a server on your network through its own name (DNS rebinding). Without either, the server logs a warning at startup. If you open setryx by more than one address, for example a public name and a LAN address, list them all.
 
 ### HTTPS (optional)
 
@@ -75,7 +78,9 @@ labels:
   - traefik.http.routers.setryx.tls.certresolver=letsencrypt
   - traefik.http.services.setryx.loadbalancer.server.port=38471
 ```
-Set `TRUST_PROXY: "true"` and `BASE_URL` when using a proxy.
+Set `TRUST_PROXY: "true"` and `BASE_URL` when using a proxy. With an `https://` `BASE_URL`, the session cookie is marked Secure and named `__Host-setryx_session`.
+
+Plain HTTP is fine on a network you trust. Don't expose it to the internet: passwords, the session cookie and API tokens would travel unencrypted.
 
 ### Backups
 
@@ -109,20 +114,28 @@ curl -H "Authorization: Bearer setryx_…" http://<your-server>:38471/api/v1/wor
 
 - **Read only** tokens can look at your exercises, workouts, routines, sessions and stats. **Read and write** tokens can also create, change and delete them.
 - A token only ever sees its owner's data. It can't sign in, change account or server settings (people, photos, backups), import or export, or manage tokens.
-- Tokens can expire after 30 days, 90 days or a year, or never. Revoke one at any time. Disabling an account stops its tokens; an admin password reset (or `reset-password`) revokes them.
+- Creating a token asks for your password.
+- Tokens can expire after 30 days, 90 days or a year, or never. Revoke one at any time.
+- Changing your password revokes your tokens too, unless you untick **Also revoke my API tokens**. Turning an account off deletes its tokens for good, and an admin password reset (or `reset-password`) revokes them.
 - Every endpoint a token can use is described in OpenAPI at `/api/v1/openapi.json`.
 
 ### Limits
 
-An admin sets these under **Settings → Limits**. They take effect straight away. The app itself isn't limited.
+An admin sets these under **Settings → Limits**. They take effect straight away, for existing sign-ins too. Using the app isn't rate limited.
 
 | Limit | Default | Applies to |
 |---|---|---|
-| Wrong passwords a minute for each account | 10 | signing in and changing a password, counted per account rather than per address, so a proxy doesn't affect it |
+| Wrong passwords a minute for each account | 10 | signing in, changing a password and creating a token. Counted per account rather than per address, so a proxy doesn't affect it |
+| Days a sign-in lasts without use | 30 | after that, that device is signed out |
+| Days a sign-in lasts at most | 90 | everyone signs in again this long after signing in; can be turned off |
+| Devices each person can be signed in on | 20 | signing in on one more signs out the device used longest ago |
 | Requests a minute for each token | 120 | the API and MCP together; can be turned off |
 | Tokens each person can have | 5 | lowering it keeps existing tokens |
+| Storage for each person | 100 MB | workouts, routines, own exercises and sessions; can be turned off |
 
-A short burst up to a limit is fine. Going over it gets HTTP 429 with a `Retry-After` header, and API responses carry `RateLimit-Limit` and `RateLimit-Remaining`. Once an account reaches its wrong-password limit, signing in to it waits a few seconds between tries, even with the right password. Counts are kept in memory, so a restart resets them.
+A short burst up to a limit is fine. Going over a rate limit gets HTTP 429 with a `Retry-After` header, and API responses carry `RateLimit-Limit` and `RateLimit-Remaining`. Once an account reaches its wrong-password limit, signing in to it waits a few seconds between tries, even with the right password. A full storage allowance answers 507; deleting still works, and a session logged offline stays on the phone until there's room. Counts are kept in memory, so a restart resets them.
+
+Everyone can see where they're signed in under **Settings → Account** and sign out any device.
 
 ### AI agents (MCP)
 

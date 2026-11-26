@@ -71,7 +71,12 @@ export const adminRoutes: FastifyPluginAsync = async (app) => {
         throw new HttpError(409, 'self_disable', 'You can’t turn off your own account.');
       }
       const updated = updateUser(db, target.id, body)!;
-      if (body.disabled) deleteUserSessions(db, target.id);
+      // Turning an account off ends its sessions and deletes its API tokens for good,
+      // so turning it back on doesn't quietly bring old tokens back.
+      if (body.disabled) {
+        deleteUserSessions(db, target.id);
+        deleteUserApiTokens(db, target.id);
+      }
       return updated;
     });
     return { user: toPublic(user) };
@@ -95,7 +100,8 @@ export const adminRoutes: FastifyPluginAsync = async (app) => {
   app.post('/invites', async (req, reply) => {
     const body = parse(createInviteRequestSchema, req.body);
     const { invite, token } = createInvite(db, req.user!.id, body.expiresInDays);
-    return reply.status(201).send({ invite, url: `${originOf(req)}/invite/${token}` });
+    // Without BASE_URL the link uses the address the admin is on; the app shows it so a wrong one stands out.
+    return reply.status(201).send({ invite, url: `${originOf(req)}/invite/${token}`, fromBaseUrl: !!req.server.config.baseUrl });
   });
 
   app.delete<IdParams>('/invites/:id', async (req, reply) => {

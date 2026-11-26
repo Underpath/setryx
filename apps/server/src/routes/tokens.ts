@@ -1,6 +1,7 @@
 import type { FastifyPluginAsync } from 'fastify';
 import { createApiTokenRequestSchema } from '@setryx/shared';
-import { requireUser } from '../app.ts';
+import { requireUser, reservePasswordAttempt } from '../app.ts';
+import { verifyPassword } from '../passwords.ts';
 import { createApiToken, deleteApiToken, listApiTokens } from '../api-tokens.ts';
 import { HttpError, parse } from '../http.ts';
 import { mcpEnabled } from '../mcp/server.ts';
@@ -16,7 +17,13 @@ export const tokenRoutes: FastifyPluginAsync = async (app) => {
   });
 
   app.post('/tokens', async (req, reply) => {
-    const body = parse(createApiTokenRequestSchema, req.body);
+    const { password, ...body } = parse(createApiTokenRequestSchema, req.body);
+    // A token outlives sessions, so making one asks for the password, not just an open session.
+    const refund = reservePasswordAttempt(req, reply, req.user!.id);
+    if (!(await verifyPassword(password, req.user!.passwordHash))) {
+      throw new HttpError(400, 'invalid_input', 'Your password is wrong.', { password: 'This password is wrong.' });
+    }
+    refund();
     const max = app.limits.get().maxTokensPerUser;
     if (listApiTokens(db, req.user!.id).length >= max) {
       throw new HttpError(400, 'too_many_tokens', `You have ${max === 1 ? 'a token' : `${max} tokens`}, the most this server allows. Revoke one you no longer use first.`);

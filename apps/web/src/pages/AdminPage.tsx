@@ -88,12 +88,23 @@ function ManageUserSheet({ me, user, onClose }: { me: PublicUser; user: PublicUs
   });
   const isMe = user.id === me.id;
   const resetErrors = fieldErrors(reset.error);
+  const [confirmOff, setConfirmOff] = useState(false);
+  if (confirmOff) {
+    return (
+      <Sheet title={`Turn off ${current.displayName}’s account?`} onClose={() => setConfirmOff(false)}>
+        <p className="muted">They’ll be signed out everywhere and can’t sign in. Their API tokens are deleted for good, so scripts and agents using them stop working, and turning the account back on doesn’t bring them back. Their workouts and history are kept.</p>
+        <FormError error={update.error} />
+        <button className="btn btn-primary btn-block" type="button" disabled={update.isPending} onClick={() => update.mutate({ disabled: true }, { onSuccess: () => setConfirmOff(false) })}>Turn off account</button>
+        <button className="btn btn-block" type="button" onClick={() => setConfirmOff(false)}>Keep it on</button>
+      </Sheet>
+    );
+  }
   return (
     <Sheet title={current.displayName} onClose={onClose}>
       <ul className="rows">
         <li className="row"><Switch label="Admin" hint="Can add and manage people." checked={current.role === 'admin'} onChange={(v) => update.mutate({ role: v ? 'admin' : 'user' })} /></li>
         {!isMe && (
-          <li className="row"><Switch label="Account turned on" hint="Turning it off signs them out and stops them signing in. Their data is kept." checked={!current.disabled} onChange={(v) => update.mutate({ disabled: !v })} /></li>
+          <li className="row"><Switch label="Account turned on" hint="Turning it off signs them out, stops them signing in and deletes their API tokens. Their data is kept." checked={!current.disabled} onChange={(v) => (v ? update.mutate({ disabled: false }) : setConfirmOff(true))} /></li>
         )}
       </ul>
       <FormError error={update.error} />
@@ -112,12 +123,12 @@ export function InvitesSection() {
   const toast = useToast();
   const invites = useQuery({ queryKey: ['admin', 'invites'], queryFn: () => api.get<{ invites: Invite[] }>('/admin/invites') });
   const settings = useQuery({ queryKey: ['admin', 'settings'], queryFn: () => api.get<AppSettings>('/admin/settings') });
-  const [newLink, setNewLink] = useState<string | null>(null);
+  const [newLink, setNewLink] = useState<{ url: string; fromBaseUrl: boolean } | null>(null);
 
   const create = useMutation({
-    mutationFn: () => api.post<{ invite: Invite; url: string }>('/admin/invites', { expiresInDays: 7 }),
-    onSuccess: ({ url }) => {
-      setNewLink(url);
+    mutationFn: () => api.post<{ invite: Invite; url: string; fromBaseUrl: boolean }>('/admin/invites', { expiresInDays: 7 }),
+    onSuccess: ({ url, fromBaseUrl }) => {
+      setNewLink({ url, fromBaseUrl });
       qc.invalidateQueries({ queryKey: ['admin', 'invites'] });
     },
     onError: (err) => toast(err.message),
@@ -172,12 +183,12 @@ export function InvitesSection() {
         </ul>
       </section>
 
-      {newLink && <InviteLinkSheet url={newLink} onClose={() => setNewLink(null)} />}
+      {newLink && <InviteLinkSheet url={newLink.url} fromBaseUrl={newLink.fromBaseUrl} onClose={() => setNewLink(null)} />}
     </>
   );
 }
 
-function InviteLinkSheet({ url, onClose }: { url: string; onClose: () => void }) {
+function InviteLinkSheet({ url, fromBaseUrl, onClose }: { url: string; fromBaseUrl: boolean; onClose: () => void }) {
   const toast = useToast();
   const copy = async () => {
     try {
@@ -196,6 +207,12 @@ function InviteLinkSheet({ url, onClose }: { url: string; onClose: () => void })
         <input id="invite-url" className="input" readOnly value={url} onFocus={(e) => e.currentTarget.select()} aria-label="Invite link" />
         <button className="icon-btn btn-quiet" type="button" onClick={copy} aria-label="Copy link"><Icon name="copy" /></button>
       </div>
+      {!fromBaseUrl && (
+        <p className="small muted">
+          The link uses the address you’re on now, <b>{new URL(url).host}</b>. Check it’s the one they should use. To always use your server’s public
+          address, set BASE_URL.
+        </p>
+      )}
       <button className="btn btn-primary btn-block" type="button" onClick={onClose}>Done</button>
     </Sheet>
   );

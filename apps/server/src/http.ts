@@ -1,6 +1,7 @@
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import type { ZodType } from 'zod';
 import type { ApiError } from '@setryx/shared';
+import { hostAllowed } from './config.ts';
 
 export class HttpError extends Error {
   readonly status: number;
@@ -40,7 +41,11 @@ export function isSameOrigin(req: FastifyRequest): boolean {
   const origin = req.headers.origin;
   if (!origin) return true; // non-browser clients (curl, CLI); cookies still required for auth
   try {
-    return new URL(origin).host === req.host;
+    const host = new URL(origin).host;
+    // With allowed hosts set, the Host header was already checked against them,
+    // and Origin must be one of them too: a rebinding page's own name is neither.
+    const allowed = req.server.config.allowedHosts;
+    return allowed ? hostAllowed(allowed, host) && host === req.host : host === req.host;
   } catch {
     return false;
   }

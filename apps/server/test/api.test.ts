@@ -108,7 +108,8 @@ test('disabling a user signs them out; the last admin is protected', async () =>
   await req('PATCH', `/api/v1/admin/users/${user.id}`, { cookie, body: { disabled: true } });
   assert.equal((await req('GET', '/api/v1/auth/me', { cookie: alex })).statusCode, 401);
   const relogin = await req('POST', '/api/v1/auth/login', { body: { username: 'alex', password: 'alex password 1' } });
-  assert.equal(relogin.statusCode, 403);
+  assert.equal(relogin.statusCode, 401, 'a turned-off account looks like a wrong password');
+  assert.equal(relogin.json().error, 'bad_credentials');
 
   const me = (await req('GET', '/api/v1/auth/me', { cookie })).json().user;
   const demote = await req('PATCH', `/api/v1/admin/users/${me.id}`, { cookie, body: { role: 'user' } });

@@ -1,6 +1,6 @@
 import type { FastifyPluginAsync } from 'fastify';
 import { loginRequestSchema, registerRequestSchema, setupRequestSchema } from '@setryx/shared';
-import { checkPasswordAttempts, clearSessionCookie, recordWrongPassword, requireUser, setSessionCookie } from '../app.ts';
+import { clearSessionCookie, requireUser, reservePasswordAttempt, setSessionCookie } from '../app.ts';
 import { tx } from '../db.ts';
 import { HttpError, parse } from '../http.ts';
 import { findOpenInvite, markInviteUsed } from '../invites.ts';
@@ -25,7 +25,7 @@ export const authRoutes: FastifyPluginAsync = async (app) => {
       if (countUsers(db) > 0) throw new HttpError(409, 'already_set_up', 'This server already has an admin. Sign in instead.');
       return insertUser(db, { username: body.username, displayName: body.displayName, passwordHash, role: 'admin' });
     });
-    const s = createSession(db, user.id, req.headers['user-agent']);
+    const s = createSession(db, user.id, req.headers['user-agent'], app.limits.get());
     setSessionCookie(req, reply, s.token, s.expiresAt);
     return reply.status(201).send({ user: toPublic(user) });
   });
@@ -36,14 +36,15 @@ export const authRoutes: FastifyPluginAsync = async (app) => {
     const user = findUserByUsername(db, body.username);
     // Unknown names are counted too, so a refusal doesn't reveal which accounts exist.
     const account = user ? user.id : `name:${body.username.trim().toLowerCase()}`;
-    checkPasswordAttempts(req, reply, account);
+    const refund = reservePasswordAttempt(req, reply, account);
     const ok = user ? await verifyPassword(body.password, user.passwordHash) : await dummyVerify(body.password);
-    if (!user || !ok) {
-      recordWrongPassword(req, account);
-      throw new HttpError(401, 'bad_credentials', 'That username and password don’t match.');
-    }
-    if (user.disabled) throw new HttpError(403, 'account_disabled', 'This account is turned off. Ask your admin to turn it back on.');
-    const s = createSession(db, user.id, req.headers['user-agent']);
+    // The password is always checked, and a turned-off account gets the same
+    // answer as a wrong password, so neither timing nor wording tells them apart.
+    if (!user || !ok || user.disabled) throw new HttpError(401, 'bad_credentials', 'That username and password don’t match.');
+    refund();
+    // Signing in again from this browser replaces its old session rather than leaving it behind.
+    if (req.sessionToken) deleteSession(db, req.sessionToken);
+    const s = createSession(db, user.id, req.headers['user-agent'], app.limits.get());
     setSessionCookie(req, reply, s.token, s.expiresAt);
     return { user: toPublic(user) };
   });
@@ -81,7 +82,7 @@ export const authRoutes: FastifyPluginAsync = async (app) => {
       if (inviteId) markInviteUsed(db, inviteId, created.id);
       return created;
     });
-    const s = createSession(db, user.id, req.headers['user-agent']);
+    const s = createSession(db, user.id, req.headers['user-agent'], app.limits.get());
     setSessionCookie(req, reply, s.token, s.expiresAt);
     return reply.status(201).send({ user: toPublic(user) });
   });

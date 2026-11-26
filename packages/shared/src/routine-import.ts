@@ -3,25 +3,34 @@ import { z } from 'zod';
 import type { ExerciseType, RestStep, WorkoutItem } from './workouts.ts';
 
 // ── Loose input schema (mirrors what the old tracker accepted) ──
+// Text is cut to a sensible length and lists to a sensible count before any
+// parsing, so a crafted file can't make the matching below slow.
+export const IMPORT_LIMITS = { routines: 50, stepsPerRoutine: 200, stepsInAll: 1000 };
+const text = (max: number) => z.string().transform((s) => s.slice(0, max));
+const short = z.union([z.number(), text(20)]);
+const capped = <T extends z.ZodType>(item: T, max: number) => z.array(item).transform((a) => a.slice(0, max));
+
 const legacyExercise = z
   .object({
-    id: z.string().optional(),
-    name: z.string(),
-    desc: z.string().optional(),
-    type: z.string().optional(),
-    reps: z.union([z.number(), z.string()]).optional(),
-    duration: z.union([z.number(), z.string()]).optional(),
-    tempo: z.string().optional(),
-    rir: z.union([z.string(), z.number()]).optional(),
-    equipment: z.string().optional(),
+    id: text(100).optional(),
+    name: text(100),
+    desc: text(2000).optional(),
+    type: text(20).optional(),
+    reps: short.optional(),
+    duration: short.optional(),
+    tempo: text(40).optional(),
+    rir: short.optional(),
+    equipment: text(200).optional(),
   })
   .loose();
 const legacyItem = legacyExercise.extend({
-  kind: z.string().optional(),
-  rounds: z.union([z.number(), z.string()]).optional(),
-  exercises: z.array(legacyExercise).optional(),
+  kind: text(20).optional(),
+  rounds: short.optional(),
+  exercises: capped(legacyExercise, 50).optional(),
 });
-const legacyRoutine = z.object({ id: z.string().optional(), name: z.string().optional(), icon: z.string().optional(), exercises: z.array(legacyItem) }).loose();
+const legacyRoutine = z
+  .object({ id: text(100).optional(), name: text(100).optional(), icon: text(16).optional(), exercises: capped(legacyItem, IMPORT_LIMITS.stepsPerRoutine) })
+  .loose();
 
 /** A workout step that points at an exercise by its import key instead of a library id. */
 export type ImportedItem =
@@ -61,9 +70,10 @@ function isRestLike(e: z.infer<typeof legacyExercise>): boolean {
  * equipment text. Per-hand weights are kept as written (one dumbbell's weight).
  */
 export function parseWeight(desc: string | undefined, equipment: string | undefined): { weight: number; source: string } | null {
+  // The lookbehinds start a number only at its first digit, which keeps these linear.
   const fromDesc = /weight:\s*(\d+(?:[.,]\d+)?)\s*kg/i.exec(desc ?? '');
   if (fromDesc) return { weight: num(fromDesc[1]!), source: fromDesc[0] };
-  const fromEquip = /(\d+(?:[.,]\d+)?)\s*kg/i.exec(equipment ?? '');
+  const fromEquip = /(?<![\d.,])(\d+(?:[.,]\d+)?)\s*kg/i.exec(equipment ?? '');
   if (fromEquip) return { weight: num(fromEquip[1]!), source: fromEquip[0] };
   return null;
 }
@@ -72,7 +82,7 @@ export function parseWeight(desc: string | undefined, equipment: string | undefi
 export function parseEquipment(equipment: string | undefined): string[] {
   return (equipment ?? '')
     .split(',')
-    .map((s) => s.replace(/\s*\d+(?:[.,]\d+)?\s*kg\b/gi, '').trim())
+    .map((s) => s.replace(/(?<![\d.,])\d+(?:[.,]\d+)?\s*kg\b/gi, ' ').replace(/\s+/g, ' ').trim())
     .filter((s) => s && s.toLowerCase() !== 'bodyweight');
 }
 
@@ -96,6 +106,8 @@ export function parseRoutineExport(data: unknown): RoutineParseResult | null {
   else if (data && typeof data === 'object' && Array.isArray((data as { routines?: unknown }).routines)) list = (data as { routines: unknown[] }).routines;
   else if (data && typeof data === 'object' && 'exercises' in data) list = [data];
   if (!list?.length) return null;
+  list = list.slice(0, IMPORT_LIMITS.routines);
+  let stepsLeft = IMPORT_LIMITS.stepsInAll;
 
   const exercises = new Map<string, ImportedExercise>();
   let seq = 0;
@@ -103,7 +115,8 @@ export function parseRoutineExport(data: unknown): RoutineParseResult | null {
 
   const convertStep = (e: z.infer<typeof legacyExercise>, workoutName: string): Exclude<ImportedItem, { kind: 'superset' }> | null => {
     const name = e.name.trim();
-    if (!name) return null;
+    if (!name || stepsLeft <= 0) return null;
+    stepsLeft--;
     if (isRestLike(e)) {
       return { kind: 'rest', id: newId(), durationS: toInt(e.duration, 30, 1, 3600), label: name.toLowerCase() === 'rest' ? null : name };
     }
@@ -163,8 +176,21 @@ const SYNONYMS: Record<string, string> = {
   db: 'dumbbell', dumbbells: 'dumbbell', bb: 'barbell', tricep: 'triceps', bicep: 'biceps', flye: 'fly', flyes: 'fly', flys: 'fly',
 };
 
+// Library names are compared over and over, so their word sets are kept.
+const tokenCache = new Map<string, Set<string>>();
+
 function tokens(name: string): Set<string> {
-  const words = normalizeName(name.replace(/\([^)]*\)/g, ' '))
+  const hit = tokenCache.get(name);
+  if (hit) return hit;
+  if (tokenCache.size > 5000) tokenCache.clear();
+  const set = computeTokens(name.slice(0, 200));
+  tokenCache.set(name, set);
+  return set;
+}
+
+function computeTokens(name: string): Set<string> {
+  // [^()] rather than [^)] keeps this linear on runs of "(".
+  const words = normalizeName(name.replace(/\([^()]*\)/g, ' '))
     .split(' ')
     .flatMap((w) => (SYNONYMS[w] ?? w).split(' '))
     .map((w) => (w.length > 2 && w.endsWith('s') && !w.endsWith('ss') ? w.slice(0, -1) : w))
@@ -174,8 +200,10 @@ function tokens(name: string): Set<string> {
 
 /** Similarity between 0 and 1 (Dice coefficient over normalised word sets). */
 export function nameSimilarity(a: string, b: string): number {
-  const ta = tokens(a);
-  const tb = tokens(b);
+  return similarity(tokens(a), tokens(b));
+}
+
+function similarity(ta: Set<string>, tb: Set<string>): number {
   if (!ta.size || !tb.size) return 0;
   let shared = 0;
   for (const t of ta) if (tb.has(t)) shared++;
@@ -183,8 +211,9 @@ export function nameSimilarity(a: string, b: string): number {
 }
 
 export function bestMatches<T extends { name: string }>(name: string, candidates: T[], limit = 3, min = 0.5): { item: T; score: number }[] {
+  const query = computeTokens(name.slice(0, 200));
   return candidates
-    .map((item) => ({ item, score: nameSimilarity(name, item.name) }))
+    .map((item) => ({ item, score: similarity(query, tokens(item.name)) }))
     .filter((m) => m.score >= min)
     .sort((x, y) => y.score - x.score)
     .slice(0, limit);

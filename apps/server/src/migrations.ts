@@ -178,4 +178,14 @@ export const migrations: { version: number; sql: string }[] = [
       CREATE INDEX api_tokens_user ON api_tokens(user_id);
     `,
   },
+  {
+    version: 6,
+    sql: `
+      -- A public id (to list and end sessions) and when each was last used.
+      ALTER TABLE auth_sessions ADD COLUMN id TEXT;
+      ALTER TABLE auth_sessions ADD COLUMN last_used_at TEXT;
+      UPDATE auth_sessions SET id = lower(hex(randomblob(16))), last_used_at = created_at;
+      CREATE UNIQUE INDEX auth_sessions_id ON auth_sessions(id);
+    `,
+  },
 ];

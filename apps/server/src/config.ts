@@ -9,6 +9,8 @@ export type Config = {
   trustProxy: boolean;
   cookieSecure: 'auto' | 'true' | 'false';
   baseUrl: string | null;
+  /** Host names the server answers to (BASE_URL's host plus ALLOWED_HOSTS); null when neither is set. */
+  allowedHosts: string[] | null;
   sessionSecret: string;
   webDist: string | null;
 };
@@ -35,6 +37,16 @@ function resolveSessionSecret(dataDir: string, fromEnv: string | undefined): str
   return secret;
 }
 
+/**
+ * Whether a host (as in a Host or Origin header, maybe with a port) is one the
+ * server answers to. An entry without a port matches any port.
+ */
+export function hostAllowed(allowed: string[], host: string): boolean {
+  const h = host.toLowerCase();
+  const bare = h.replace(/:\d+$/, '');
+  return allowed.some((a) => a === h || (!/:\d+$/.test(a) && a === bare));
+}
+
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   const dataDir = resolve(env.DATA_DIR || './data');
   mkdirSync(dataDir, { recursive: true });
@@ -45,6 +57,23 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   const cookieSecure = (env.COOKIE_SECURE || 'auto').toLowerCase();
   if (!['auto', 'true', 'false'].includes(cookieSecure)) throw new Error('COOKIE_SECURE must be auto, true or false.');
 
+  const baseUrl = env.BASE_URL ? env.BASE_URL.replace(/\/+$/, '') : null;
+  let baseHost: string | null = null;
+  if (baseUrl) {
+    try {
+      const u = new URL(baseUrl);
+      if (u.protocol !== 'http:' && u.protocol !== 'https:') throw new Error();
+      baseHost = u.host.toLowerCase();
+    } catch {
+      throw new Error(`BASE_URL must be a full address like https://setryx.example.com, got "${env.BASE_URL}".`);
+    }
+  }
+  const listed = (env.ALLOWED_HOSTS ?? '')
+    .split(',')
+    .map((h) => h.trim().toLowerCase())
+    .filter(Boolean);
+  const allowedHosts = baseHost || listed.length ? [...new Set([...(baseHost ? [baseHost] : []), ...listed])] : null;
+
   const webDist = env.WEB_DIST ? resolve(env.WEB_DIST) : resolve(import.meta.dirname, '../../web/dist');
 
   return {
@@ -53,7 +82,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     dataDir,
     trustProxy: bool(env.TRUST_PROXY, false),
     cookieSecure: cookieSecure as Config['cookieSecure'],
-    baseUrl: env.BASE_URL ? env.BASE_URL.replace(/\/+$/, '') : null,
+    baseUrl,
+    allowedHosts,
     sessionSecret: resolveSessionSecret(dataDir, env.SESSION_SECRET),
     webDist: existsSync(webDist) ? webDist : null,
   };

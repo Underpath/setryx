@@ -14,10 +14,13 @@ services:
       PORT: "38471"
       # Set to true when a reverse proxy sits in front, so HTTPS and client IPs are detected.
       TRUST_PROXY: "false"
-      # auto = Secure cookies when the proxy reports HTTPS.
+      # auto = Secure cookies when the proxy reports HTTPS or BASE_URL is https://.
       COOKIE_SECURE: auto
-      # Public address, used in invite links. Optional.
+      # Public address, used in invite links. When set, the server only answers to this host
+      # (and ALLOWED_HOSTS), which blocks DNS-rebinding pages.
       # BASE_URL: https://setryx.example.com
+      # Other names or addresses you open setryx by, comma separated.
+      # ALLOWED_HOSTS: 192.168.1.5,setryx.lan
     volumes:
       - setryx-data:/data
 

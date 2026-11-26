@@ -3,10 +3,40 @@ import { argon2, randomBytes, timingSafeEqual } from 'node:crypto';
 // OWASP-recommended argon2id parameters: 19 MiB memory, 2 passes, 1 lane.
 const PARAMS = { memory: 19456, passes: 2, parallelism: 1, tagLength: 32 };
 
+// Each argon2 run takes a thread from Node's small pool and 19 MiB of memory,
+// so only a few run at once and a flood of sign-ins waits in a short queue
+// instead of starving file access for everyone else.
+const MAX_RUNNING = 2;
+const MAX_WAITING = 50;
+let running = 0;
+const waiting: (() => void)[] = [];
+
+/** Thrown when too many password checks are already waiting. */
+export class PasswordsBusyError extends Error {}
+
+async function slot<T>(work: () => Promise<T>): Promise<T> {
+  if (running >= MAX_RUNNING) {
+    if (waiting.length >= MAX_WAITING) throw new PasswordsBusyError('Too many password checks at once.');
+    await new Promise<void>((resolve) => waiting.push(resolve));
+  } else {
+    running++;
+  }
+  try {
+    return await work();
+  } finally {
+    const next = waiting.shift();
+    if (next) next(); // hand the slot straight on
+    else running--;
+  }
+}
+
 function derive(password: string, nonce: Buffer, p: typeof PARAMS): Promise<Buffer> {
-  return new Promise((resolve, reject) => {
-    argon2('argon2id', { message: password, nonce, ...p }, (err, key) => (err ? reject(err) : resolve(key)));
-  });
+  return slot(
+    () =>
+      new Promise((resolve, reject) => {
+        argon2('argon2id', { message: password, nonce, ...p }, (err, key) => (err ? reject(err) : resolve(key)));
+      }),
+  );
 }
 
 /** Returns a PHC-format string: $argon2id$v=19$m=…,t=…,p=…$salt$hash */

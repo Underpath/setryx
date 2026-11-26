@@ -91,7 +91,7 @@ const didYouMean = (what: string, ref: string, options: { name: string }[]) => {
     .sort((a, b) => b.score - a.score)
     .slice(0, 5)
     .map((m) => m.name);
-  return new ToolError(`No ${what} called “${ref}”.${close.length ? ` Did you mean: ${close.join(', ')}?` : ''}`);
+  return new ToolError(`No ${what} called “${ref}”.${close.length ? ` Did you mean: ${close.map((n) => `“${n}”`).join(', ')}?` : ''}`);
 };
 
 /** Resolves exercise names or ids among the caller's visible exercises (library plus their own). */
@@ -107,7 +107,7 @@ function exerciseResolver(ctx: Ctx) {
     if (!hits.length) hits = list.filter((e) => sameExerciseName(e.name, ref));
     if (hits.length > 1) hits = hits.filter((e) => e.isCustom).length === 1 ? hits.filter((e) => e.isCustom) : hits;
     if (hits.length === 1) return hits[0]!;
-    if (hits.length > 1) throw new ToolError(`More than one exercise is called “${ref}”. Use its id: ${hits.map((h) => `${h.name} (${h.id})`).join(', ')}.`);
+    if (hits.length > 1) throw new ToolError(`More than one exercise is called “${ref}”. Use its id: ${hits.map((h) => `“${h.name}” (${h.id})`).join(', ')}.`);
     throw didYouMean('exercise', ref, list);
   };
 }
@@ -168,7 +168,7 @@ function toItems(ctx: Ctx, items: ItemIn[]): WorkoutItem[] {
   const resolve = exerciseResolver(ctx);
   const step = (x: z.infer<typeof blockExerciseIn>) => {
     const ex = resolve(x.exerciseId ?? x.exercise);
-    if (x.reps == null && x.durationS == null) throw new ToolError(`Give reps or durationS for ${ex.name}.`);
+    if (x.reps == null && x.durationS == null) throw new ToolError(`Give reps or durationS for “${ex.name}”.`);
     const timed = x.durationS != null && x.reps == null;
     return {
       kind: 'exercise' as const,
@@ -278,7 +278,7 @@ async function toEntries(ctx: Ctx, mode: Routine['mode'], wanted: z.infer<typeof
     const keptMissing = !hit ? existing.find((e) => e.workoutId === w.workout && !used.has(e.id)) : undefined;
     if (!hit && !keptMissing) throw didYouMean('workout', w.workout, workouts);
     const workoutId = hit?.id ?? keptMissing!.workoutId;
-    if (mode === 'weekly' && !w.day) throw new ToolError(`Weekly routines need a day for every workout; ${hit?.name ?? w.workout} has none.`);
+    if (mode === 'weekly' && !w.day) throw new ToolError(`Weekly routines need a day for every workout; “${hit?.name ?? w.workout}” has none.`);
     const weekday = mode === 'weekly' ? dayIndex(w.day!) : null;
     const same =
       existing.find((e) => !used.has(e.id) && e.workoutId === workoutId && e.weekday === weekday) ?? existing.find((e) => !used.has(e.id) && e.workoutId === workoutId);
@@ -509,7 +509,7 @@ export const TOOLS: Tool[] = [
     }),
     async run(ctx, { exercise, type, ...changes }) {
       const ex = exerciseResolver(ctx)(exercise);
-      if (!ex.isCustom) throw new ToolError(`${ex.name} is a library exercise and can’t be changed. Create your own version with create_exercise.`);
+      if (!ex.isCustom) throw new ToolError(`“${ex.name}” is a library exercise and can’t be changed. Create your own version with create_exercise.`);
       const body = { name: ex.name, defaultType: type ?? ex.defaultType, category: ex.category, primaryMuscles: ex.primaryMuscles, secondaryMuscles: ex.secondaryMuscles, equipment: ex.equipment, instructions: ex.instructions };
       for (const [k, v] of Object.entries(changes)) if (v !== undefined) (body as Record<string, unknown>)[k] = v;
       return (await ctx.api<{ exercise: Exercise }>('PUT', `/exercises/${enc(ex.id)}`, body)).exercise;
@@ -524,7 +524,7 @@ export const TOOLS: Tool[] = [
     input: z.object({ exercise: ref('Exercise') }),
     async run(ctx, { exercise }) {
       const ex = exerciseResolver(ctx)(exercise);
-      if (!ex.isCustom) throw new ToolError(`${ex.name} is a library exercise and can’t be removed.`);
+      if (!ex.isCustom) throw new ToolError(`“${ex.name}” is a library exercise and can’t be removed.`);
       await ctx.api('DELETE', `/exercises/${enc(ex.id)}`);
       return { deleted: ex.name };
     },
@@ -594,7 +594,7 @@ export const TOOLS: Tool[] = [
         if (!c.exercise && !c.step) throw new ToolError('Each change needs an exercise or a step id.');
         const exId = c.exercise ? resolve(c.exercise).id : null;
         const hits = steps.filter((s) => (c.step ? s.id === c.step : s.kind === 'exercise' && s.exerciseId === exId));
-        if (!hits.length) throw new ToolError(`${c.step ? `No step ${c.step}` : `${c.exercise} isn’t`} in ${cur.workout.name}.`);
+        if (!hits.length) throw new ToolError(`${c.step ? `No step ${c.step}` : `“${c.exercise}” isn’t`} in “${cur.workout.name}”.`);
         for (const s of hits) {
           const u = updates.get(s.id) ?? { itemId: s.id };
           if (c.reps !== undefined) u.targetReps = c.reps;
@@ -761,7 +761,7 @@ export const TOOLS: Tool[] = [
       const logs = a.sets.map((s: { exercise: string; reps?: number; weight?: number; durationS?: number }, i: number) => {
         const ex = resolve(s.exercise);
         snapshotExercises[ex.id] ??= ex;
-        if (s.reps == null && s.durationS == null) throw new ToolError(`Give reps or durationS for each ${ex.name} set.`);
+        if (s.reps == null && s.durationS == null) throw new ToolError(`Give reps or durationS for each “${ex.name}” set.`);
         const idx = steps.findIndex((st, j) => !usedSteps.has(j) && st.kind === 'exercise' && st.exerciseId === ex.id);
         const step = idx >= 0 ? steps[idx]! : null;
         if (idx >= 0) usedSteps.add(idx);
