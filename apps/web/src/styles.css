@@ -293,11 +293,11 @@ textarea.input { resize: vertical; min-height: 88px; line-height: 1.45; }
 .cues b { display: block; font: 700 1.5rem/1 var(--display); }
 .next-line { font-size: 1.15rem; line-height: 1.35; max-width: 28ch; }
 .next-line b { font-weight: 700; }
-.tap-hint { margin-top: 20px; font-weight: 700; font-size: .95rem; display: inline-flex; align-items: center; gap: 10px; opacity: .9; }
+.tap-hint { margin-top: 20px; font-weight: 700; font-size: .95rem; display: inline-flex; align-items: center; gap: 10px; }
 .tap-hint::before { content: ""; width: 26px; height: 26px; border-radius: 999px; border: 2.5px solid currentColor; }
 
 .p-bottom { padding: 0 16px calc(14px + env(safe-area-inset-bottom)); display: grid; gap: 12px; }
-.next { border-top: 1.5px solid currentColor; padding-top: 10px; display: flex; justify-content: space-between; gap: 12px; font-size: .9rem; opacity: .92; }
+.next { border-top: 1.5px solid currentColor; padding-top: 10px; display: flex; justify-content: space-between; gap: 12px; font-size: .9rem; }
 .next > span:last-child { text-align: right; }
 .preview { display: grid; gap: 2px; font-size: .875rem; padding: 10px 12px; border-radius: 12px; background: rgba(0,0,0,.22); }
 .controls { display: grid; grid-template-columns: repeat(3, 1fr); justify-items: center; align-items: start; }
@@ -385,7 +385,7 @@ textarea.input { resize: vertical; min-height: 88px; line-height: 1.45; }
 .cue { display: grid; gap: 3px; padding: 0 18px; border-left: 2px solid currentColor; }
 .cues .cue, .cue-facts .cue { border-left-color: rgba(255,255,255,.4); }
 .cue:first-child { padding-left: 0; border-left: 0; }
-.cue small { font-size: .78rem; font-weight: 700; opacity: .85; }
+.cue small { font-size: .78rem; font-weight: 700; }
 .cue b { font: 700 1.6rem/1 var(--display); letter-spacing: .02em; color: inherit; }
 .outbox-notice p { display: grid; gap: 8px; }
 .outbox-failed { display: block; }
