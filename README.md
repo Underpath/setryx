@@ -2,7 +2,17 @@
 
 A self-hosted workout tracker for one household or a group of friends. It runs as a single Docker container serving plain HTTP. If you want HTTPS, put your own reverse proxy in front.
 
-Status: early development. Accounts, the exercise library, workout building, routine import, the workout player, session review and offline sync work. Routines and charts come next.
+What it does:
+
+- **Workouts:** build them from a library of 876 exercises plus your own, with sets, reps, weights, timed holds, rests and supersets.
+- **Player:** a full-screen guide through the workout, with timers, sounds and voice cues. It keeps the screen on and picks up where you left off after a reload.
+- **Review:** check what you did after each workout. setryx suggests new targets and updates the workout if you agree.
+- **Offline:** finish a workout with no connection; it uploads when the server is reachable again.
+- **Routines:** a rotation (Push A, Pull A, …), a one-off programme, or a weekly plan. Today shows what's up next.
+- **Stats:** a streak, a calendar, sessions per week, and charts and records for each exercise.
+- **Accounts:** everyone has their own data; an admin adds people or sends invite links.
+
+Status: working towards v1.0. Everything above works; the remaining work before v1.0 is behind the scenes, not in the app's screens.
 
 ## Run it
 
@@ -13,9 +23,25 @@ docker compose up -d --build
 
 Open `http://<your-server>:38471`. The first account you create becomes the admin. Sign-up then closes. To add people, go to **Settings → People and invites**, then either create accounts yourself or send invite links.
 
-Data lives in the `setryx-data` volume (`/data` in the container): the SQLite database and the generated session secret.
+Data lives in the `setryx-data` volume (`/data` in the container): the SQLite database, the generated session secret, database copies (`backups/`) and exercise photos if you turn them on (`exercise-images/`).
+
+### Update
+
+```bash
+git pull
+```
+
+```bash
+docker compose up -d --build
+```
+
+If an update changes the database, setryx first saves a copy of it as it was (see [Backups](#backups)).
 
 The exercise library comes from [free-exercise-db](https://github.com/yuhonas/free-exercise-db) (public domain).
+
+### Exercise photos (optional)
+
+Photos are off by default, and setryx contacts nothing outside your network until an admin turns them on under **Settings → Exercise photos**. Once on, each photo is downloaded from GitHub the first time someone opens that exercise. Or use **Download all** to fetch every photo up front (about 100 MB). They're kept in `/data/exercise-images`, and **Remove downloaded photos** deletes them again. Your own exercises have no photos.
 
 ### Configuration
 
@@ -96,9 +122,9 @@ npm install
 npm run dev
 ```
 
-The API runs on :38471 and Vite on :5173 (it proxies `/api`). Other commands: `npm test` runs the API tests, `npm run typecheck` checks types, and `npm run build` builds the web app into `apps/web/dist`, which the server serves.
+The API runs on :38471 and Vite on :5173 (it proxies `/api`). Other commands: `npm test` runs the shared logic and API tests, `npm run typecheck` checks types, and `npm run build` builds the web app into `apps/web/dist`, which the server serves.
 
-Layout: `apps/server` (Fastify + built-in `node:sqlite`), `apps/web` (React + Vite), `packages/shared` (Zod schemas used by both).
+Layout: `apps/server` (Fastify + built-in `node:sqlite`), `apps/web` (React + Vite, installable as an app), `packages/shared` (schemas and the logic used by both: the workout player, routines and stats), `e2e` (the browser test).
 
 ### End-to-end test
 
