@@ -21,6 +21,9 @@ services:
       # BASE_URL: https://setryx.example.com
       # Other names or addresses you open Setryx by, comma separated.
       # ALLOWED_HOSTS: 192.168.1.5,setryx.lan
+      # The user and group Setryx runs as, and who owns its files (default 1000).
+      # PUID: "1000"
+      # PGID: "1000"
     volumes:
       - setryx-data:/data
       # Downloaded exercise photos, kept apart so they stay out of data backups.

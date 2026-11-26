@@ -39,6 +39,9 @@ services:
       # BASE_URL: https://setryx.example.com
       # Other names or addresses you open Setryx by, comma separated.
       # ALLOWED_HOSTS: 192.168.1.5,setryx.lan
+      # The user and group Setryx runs as, and who owns its files (default 1000).
+      # PUID: "1000"
+      # PGID: "1000"
     volumes:
       - setryx-data:/data
       - setryx-images:/images
@@ -70,6 +73,9 @@ The exercise library and its photos come from [free-exercise-db](https://github.
 | `ALLOWED_HOSTS` | (unset) | More names or addresses the server answers to, comma separated, e.g. `192.168.1.5,setryx.lan`. A name without a port matches any port |
 | `SESSION_SECRET` | generated | Signs session cookies; at least 32 characters. Left unset, Setryx generates one and keeps it in `/data` |
 | `IMAGES_DIR` | `/images` | Where downloaded exercise photos are kept |
+| `PUID` / `PGID` | `1000` | The user and group id Setryx runs as (see below) |
+
+**File ownership (`PUID` and `PGID`).** Setryx runs as user and group 1000, not as root. On start, the container gives `/data` and `/images` to that user, so a host folder or an old volume owned by someone else works without changes. Then it drops root before Setryx starts. If your host folders should belong to a different user, for example to match your NAS account, set `PUID` and `PGID` to that user's ids (run `id` on the host to see them). Files already there are handed over on the next start. If you start the container with compose's `user:` instead, that user is used as is and nothing is changed, so its folders must already be writable by it.
 
 Set `BASE_URL` or `ALLOWED_HOSTS`. Then Setryx turns away requests for any other host name, which stops a malicious web page from reaching a server on your network through its own name (DNS rebinding). Without either, the server logs a warning at startup. If you open Setryx by more than one address, for example a public name and a LAN address, list them all.
 
