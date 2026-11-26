@@ -1,5 +1,6 @@
 # syntax=docker/dockerfile:1
-FROM node:24-bookworm-slim AS build
+# Alpine keeps the image small; node:sqlite and crypto.argon2 are built into Node.
+FROM node:24-alpine AS build
 WORKDIR /app
 COPY package.json package-lock.json .npmrc ./
 COPY packages/shared/package.json packages/shared/
@@ -9,16 +10,30 @@ RUN npm ci
 COPY tsconfig.base.json ./
 COPY packages packages
 COPY apps apps
-RUN npm run build && npm prune --omit=dev
+RUN npm run build
 
-FROM node:24-bookworm-slim
+# Runtime packages for the server only: the web app is already compiled into dist.
+FROM node:24-alpine AS deps
+WORKDIR /app
+COPY package.json package-lock.json .npmrc ./
+COPY packages/shared/package.json packages/shared/
+COPY apps/server/package.json apps/server/
+COPY apps/web/package.json apps/web/
+RUN npm ci --omit=dev --workspace @setryx/server --include-workspace-root=false && rm -rf /root/.npm
+
+# Final image: plain Alpine plus the Node binary. npm, corepack and yarn from the
+# Node image are only needed to build, so they're left behind.
+FROM alpine:3.24
+RUN apk add --no-cache libstdc++ libgcc \
+ && addgroup -g 1000 node && adduser -u 1000 -G node -s /bin/sh -D node
+COPY --from=build /usr/local/bin/node /usr/local/bin/node
 ENV NODE_ENV=production \
     PORT=38471 \
     DATA_DIR=/data \
     NODE_NO_WARNINGS=1
 WORKDIR /app
 COPY --from=build /app/package.json ./
-COPY --from=build /app/node_modules node_modules
+COPY --from=deps /app/node_modules node_modules
 COPY --from=build /app/packages/shared packages/shared
 COPY --from=build /app/apps/server/package.json apps/server/
 COPY --from=build /app/apps/server/src apps/server/src
