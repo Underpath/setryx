@@ -1,9 +1,10 @@
 import { mkdir, readdir, rename, rm, stat, writeFile } from 'node:fs/promises';
-import { join } from 'node:path';
+import { cpSync, existsSync, rmSync } from 'node:fs';
+import { join, resolve as resolvePath } from 'node:path';
 import type { DB } from './db.ts';
 
 // Exercise photos from the free-exercise-db project (public domain), kept in
-// /data/exercise-images. Off by default: nothing is fetched until an admin
+// their own folder (IMAGES_DIR, /images in the Docker image). Off by default: nothing is fetched until an admin
 // allows it. When allowed, a photo is downloaded the first time someone opens
 // that exercise, or all at once with the admin's "Download all".
 
@@ -13,7 +14,6 @@ const SAMPLE_AVG_BYTES = 55_960;
 const MAX_BYTES = 3_000_000;
 const PATH_RE = /^[A-Za-z0-9_()'.,-]{1,120}\/\d{1,2}\.jpg$/;
 
-export const imagesDir = (dataDir: string) => join(dataDir, 'exercise-images');
 
 export function imagesAllowed(db: DB): boolean {
   const row = db.prepare("SELECT value FROM app_settings WHERE key = 'exercise_images'").get() as { value: string } | undefined;
@@ -75,11 +75,11 @@ const isJpeg = (b: Buffer) => b.length > 3 && b[0] === 0xff && b[1] === 0xd8 && 
  * Downloads one photo into the data folder. True when it's there afterwards.
  * The source is trusted only so far: no redirects, at most MAX_BYTES, and it must be a JPEG.
  */
-export function fetchImage(dataDir: string, path: string, source = IMAGE_SOURCE): Promise<boolean> {
+export function fetchImage(dir: string, path: string, source = IMAGE_SOURCE): Promise<boolean> {
   const pending = inFlight.get(path);
   if (pending) return pending;
   const p = (async () => {
-    const file = join(imagesDir(dataDir), path);
+    const file = join(dir, path);
     if (await exists(file)) return true;
     const res = await fetch(source + path.split('/').map(encodeURIComponent).join('/'), { signal: AbortSignal.timeout(20_000), redirect: 'error' });
     if (!res.ok) return false;
@@ -102,7 +102,7 @@ export function fetchImage(dataDir: string, path: string, source = IMAGE_SOURCE)
 type Job = { running: boolean; cancelled: boolean; total: number; done: number; failed: number; finishedAt: string | null };
 const job: Job = { running: false, cancelled: false, total: 0, done: 0, failed: 0, finishedAt: null };
 
-export function startDownloadAll(db: DB, dataDir: string): void {
+export function startDownloadAll(db: DB, dir: string): void {
   if (job.running) return;
   const paths = knownImages(db);
   Object.assign(job, { running: true, cancelled: false, total: paths.length, done: 0, failed: 0, finishedAt: null });
@@ -110,7 +110,7 @@ export function startDownloadAll(db: DB, dataDir: string): void {
   const worker = async () => {
     while (!job.cancelled && next < paths.length) {
       const p = paths[next++]!;
-      if (await fetchImage(dataDir, p)) job.done++;
+      if (await fetchImage(dir, p)) job.done++;
       else job.failed++;
     }
   };
@@ -121,26 +121,26 @@ export function startDownloadAll(db: DB, dataDir: string): void {
   });
 }
 
-async function onDisk(dataDir: string): Promise<{ count: number; bytes: number }> {
+async function onDisk(dir: string): Promise<{ count: number; bytes: number }> {
   let count = 0;
   let bytes = 0;
   let dirs: string[] = [];
   try {
-    dirs = await readdir(imagesDir(dataDir));
+    dirs = await readdir(dir);
   } catch {
     return { count, bytes };
   }
   for (const d of dirs) {
     let files: string[] = [];
     try {
-      files = await readdir(join(imagesDir(dataDir), d));
+      files = await readdir(join(dir, d));
     } catch {
       continue;
     }
     for (const f of files) {
       if (!f.endsWith('.jpg')) continue;
       try {
-        bytes += (await stat(join(imagesDir(dataDir), d, f))).size;
+        bytes += (await stat(join(dir, d, f))).size;
         count++;
       } catch {
         /* removed meanwhile */
@@ -160,11 +160,11 @@ export type ImagesStatus = {
   job: { running: boolean; total: number; done: number; failed: number; finishedAt: string | null };
 };
 
-export async function imagesStatus(db: DB, dataDir: string): Promise<ImagesStatus> {
+export async function imagesStatus(db: DB, dir: string): Promise<ImagesStatus> {
   const total = knownImages(db).length;
   // Job state first: if it says finished, the count that follows includes every file it wrote.
   const jobNow = { running: job.running, total: job.total, done: job.done, failed: job.failed, finishedAt: job.finishedAt };
-  const disk = await onDisk(dataDir);
+  const disk = await onDisk(dir);
   const avg = disk.count >= 20 ? disk.bytes / disk.count : SAMPLE_AVG_BYTES;
   return {
     allowed: imagesAllowed(db),
@@ -176,7 +176,23 @@ export async function imagesStatus(db: DB, dataDir: string): Promise<ImagesStatu
   };
 }
 
-export async function removeAllImages(dataDir: string): Promise<void> {
+export async function removeAllImages(dir: string): Promise<void> {
   job.cancelled = true;
-  await rm(imagesDir(dataDir), { recursive: true, force: true });
+  await rm(dir, { recursive: true, force: true });
+}
+
+/**
+ * Photos used to live in /data/exercise-images. When IMAGES_DIR points
+ * elsewhere (its own volume), move any found there, once, at startup.
+ */
+export function moveOldImages(dataDir: string, dir: string, log: (msg: string) => void): void {
+  const old = join(dataDir, 'exercise-images');
+  if (resolvePath(old) === resolvePath(dir) || !existsSync(old)) return;
+  try {
+    cpSync(old, dir, { recursive: true, force: false, errorOnExist: false });
+    rmSync(old, { recursive: true, force: true });
+    log(`Moved downloaded exercise photos from ${old} to ${dir}.`);
+  } catch (err) {
+    log(`Couldn't move exercise photos from ${old} to ${dir}: ${(err as Error).message}. They can be downloaded again.`);
+  }
 }

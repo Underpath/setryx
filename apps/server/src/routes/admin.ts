@@ -140,23 +140,23 @@ export const adminRoutes: FastifyPluginAsync = async (app) => {
   });
 
   // ── Exercise photos ──
-  app.get('/exercise-images', async () => imagesStatus(db, app.config.dataDir));
+  app.get('/exercise-images', async () => imagesStatus(db, app.config.imagesDir));
 
   app.patch('/exercise-images', async (req) => {
     const { allowed } = parse(z.object({ allowed: z.boolean() }), req.body);
     setImagesAllowed(db, allowed);
-    return imagesStatus(db, app.config.dataDir);
+    return imagesStatus(db, app.config.imagesDir);
   });
 
   app.post('/exercise-images/download', async () => {
     if (!imagesAllowed(db)) throw new HttpError(409, 'not_allowed', 'Turn on exercise photos first.');
-    startDownloadAll(db, app.config.dataDir);
-    return imagesStatus(db, app.config.dataDir);
+    startDownloadAll(db, app.config.imagesDir);
+    return imagesStatus(db, app.config.imagesDir);
   });
 
   app.delete('/exercise-images', async () => {
-    await removeAllImages(app.config.dataDir);
-    return imagesStatus(db, app.config.dataDir);
+    await removeAllImages(app.config.imagesDir);
+    return imagesStatus(db, app.config.imagesDir);
   });
 
   // ── Server settings ──

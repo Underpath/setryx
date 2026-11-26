@@ -6,6 +6,8 @@ export type Config = {
   port: number;
   host: string;
   dataDir: string;
+  /** Downloaded exercise photos; their own volume in Docker, so they stay out of data backups. */
+  imagesDir: string;
   trustProxy: boolean;
   cookieSecure: 'auto' | 'true' | 'false';
   baseUrl: string | null;
@@ -80,6 +82,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     port,
     host: env.HOST || '0.0.0.0',
     dataDir,
+    imagesDir: resolve(env.IMAGES_DIR || join(dataDir, 'exercise-images')),
     trustProxy: bool(env.TRUST_PROXY, false),
     cookieSecure: cookieSecure as Config['cookieSecure'],
     baseUrl,

@@ -135,7 +135,7 @@ export const backupSettingsSchema = z.object({
   latestEveryMinutes: z.union([z.literal(0), z.literal(5), z.literal(15), z.literal(60), z.literal(360), z.literal(1440)]),
 });
 export type BackupSettings = z.infer<typeof backupSettingsSchema>;
-export const defaultBackupSettings = (dataDir: string): BackupSettings => ({ dir: `${dataDir.replace(/\/$/, '')}/backups`, keep: 3, latestEveryMinutes: 15 });
+export const defaultBackupSettings = (dataDir: string): BackupSettings => ({ dir: `${dataDir.replace(/\/$/, '')}/backups`, keep: 3, latestEveryMinutes: 1440 });
 
 export type BackupFile = { name: string; kind: 'latest' | 'before-update' | 'manual'; bytes: number; modifiedAt: string };
 

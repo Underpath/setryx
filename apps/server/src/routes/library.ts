@@ -13,7 +13,7 @@ import {
   updateCustomExercise,
 } from '../exercises.ts';
 import { HttpError, parse } from '../http.ts';
-import { fetchImage, imagesAllowed, imagesDir, isKnownImage, isValidPath } from '../exercise-images.ts';
+import { fetchImage, imagesAllowed, isKnownImage, isValidPath } from '../exercise-images.ts';
 
 const searchQuerySchema = z.object({
   q: z.string().trim().max(100).optional(),
@@ -35,12 +35,12 @@ export const libraryRoutes: FastifyPluginAsync = async (app) => {
     const path = `${req.params.dir}/${req.params.file}`;
     const notFound = new HttpError(404, 'not_found', 'No such image.');
     if (!isValidPath(path) || !imagesAllowed(db)) throw notFound;
-    const file = join(imagesDir(app.config.dataDir), path);
+    const file = join(app.config.imagesDir, path);
     let data: Buffer;
     try {
       data = await readFile(file);
     } catch {
-      if (!isKnownImage(db, path) || !(await fetchImage(app.config.dataDir, path))) throw notFound;
+      if (!isKnownImage(db, path) || !(await fetchImage(app.config.imagesDir, path))) throw notFound;
       data = await readFile(file);
     }
     return reply.header('Content-Type', 'image/jpeg').header('Cache-Control', 'private, no-cache').send(data);

@@ -30,6 +30,7 @@ COPY --from=build /usr/local/bin/node /usr/local/bin/node
 ENV NODE_ENV=production \
     PORT=38471 \
     DATA_DIR=/data \
+    IMAGES_DIR=/images \
     NODE_NO_WARNINGS=1
 WORKDIR /app
 COPY --from=build /app/package.json ./
@@ -44,9 +45,9 @@ COPY LICENSE THIRD_PARTY_LICENSES.md ./
 RUN printf '#!/bin/sh\nexec node /app/apps/server/src/cli.ts reset-password "$@"\n' > /usr/local/bin/reset-password \
  && printf '#!/bin/sh\nexec node /app/apps/server/src/cli.ts list-users\n' > /usr/local/bin/list-users \
  && chmod +x /usr/local/bin/reset-password /usr/local/bin/list-users \
- && mkdir -p /data && chown node:node /data
+ && mkdir -p /data /images && chown node:node /data /images
 USER node
-VOLUME /data
+VOLUME /data /images
 EXPOSE 38471
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s \
   CMD node -e "fetch('http://127.0.0.1:'+process.env.PORT+'/api/health').then(r=>process.exit(r.ok?0:1),()=>process.exit(1))"

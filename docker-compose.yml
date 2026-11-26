@@ -23,6 +23,9 @@ services:
       # ALLOWED_HOSTS: 192.168.1.5,setryx.lan
     volumes:
       - setryx-data:/data
+      # Downloaded exercise photos, kept apart so they stay out of data backups.
+      - setryx-images:/images
 
 volumes:
   setryx-data:
+  setryx-images:

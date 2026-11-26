@@ -92,7 +92,7 @@ test('admin backup settings: folder, how many to keep, the up-to-date copy, copy
   const req = (method: 'GET' | 'PUT' | 'POST', url: string, body?: object) => app.inject({ method, url, payload: body, headers: { cookie } });
 
   const first = (await req('GET', '/api/v1/admin/backups')).json();
-  assert.deepEqual(first.settings, { dir: join(dir, 'backups'), keep: 3, latestEveryMinutes: 15 });
+  assert.deepEqual(first.settings, { dir: join(dir, 'backups'), keep: 3, latestEveryMinutes: 1440 });
 
   // Copy now, three times with keep 2: the oldest manual copy goes.
   const other = join(dir, 'elsewhere');

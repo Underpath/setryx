@@ -1,11 +1,11 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { createServer, type Server } from 'node:http';
-import { existsSync, mkdtempSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { AddressInfo } from 'node:net';
-import { fetchImage, imagesDir } from '../src/exercise-images.ts';
+import { fetchImage, moveOldImages } from '../src/exercise-images.ts';
 
 // A stand-in for the photo source that misbehaves in each way it could.
 const JPEG = Buffer.concat([Buffer.from([0xff, 0xd8, 0xff, 0xe0]), Buffer.alloc(100, 1)]);
@@ -42,7 +42,7 @@ const fresh = () => mkdtempSync(join(tmpdir(), 'setryx-img-'));
 test('a JPEG is downloaded and saved', async () => {
   const dir = fresh();
   assert.equal(await fetchImage(dir, 'ok/0.jpg', source), true);
-  assert.ok(existsSync(join(imagesDir(dir), 'ok/0.jpg')));
+  assert.ok(existsSync(join(dir, 'ok/0.jpg')));
 });
 
 test('redirects, non-JPEGs and oversized photos are refused and nothing is saved', async () => {
@@ -51,6 +51,23 @@ test('redirects, non-JPEGs and oversized photos are refused and nothing is saved
     const t0 = Date.now();
     assert.equal(await fetchImage(dir, path, source), false, path);
     assert.ok(Date.now() - t0 < 5000, `${path} took ${Date.now() - t0} ms`);
-    assert.ok(!existsSync(join(imagesDir(dir), path)), path);
+    assert.ok(!existsSync(join(dir, path)), path);
   }
+});
+
+test('photos in the old place inside the data folder move to the photo folder once', () => {
+  const data = fresh();
+  const images = fresh();
+  mkdirSync(join(data, 'exercise-images/Squat'), { recursive: true });
+  writeFileSync(join(data, 'exercise-images/Squat/0.jpg'), JPEG);
+  const logs: string[] = [];
+  moveOldImages(data, images, (m) => logs.push(m));
+  assert.ok(existsSync(join(images, 'Squat/0.jpg')));
+  assert.ok(!existsSync(join(data, 'exercise-images')));
+  assert.equal(logs.length, 1);
+  moveOldImages(data, images, (m) => logs.push(m));
+  assert.equal(logs.length, 1, 'nothing to do the second time');
+  // Without a separate folder, the old place is the photo folder: nothing moves.
+  moveOldImages(images, join(images, 'exercise-images'), (m) => logs.push(m));
+  assert.equal(logs.length, 1);
 });

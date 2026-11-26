@@ -13,86 +13,88 @@ What it does:
 - **Accounts:** everyone has their own data; an admin adds people or sends invite links.
 - **API and MCP:** personal tokens let scripts and AI agents read and edit your workouts (see [API](#api) and [AI agents](#ai-agents-mcp)).
 
+<p align="center">
+  <img src="docs/screenshots/player.png" alt="The workout player on a set of bench press: 8 reps at 60 kg, with the rest that follows" width="260">
+  <img src="docs/screenshots/exercise.png" alt="An exercise from the library with start and end photos and step-by-step instructions" width="260">
+  <img src="docs/screenshots/stats.png" alt="Stats: a 7-week streak, a training calendar and sessions per week" width="260">
+</p>
+
 Status: working towards v1.0. Everything above works; the remaining work before v1.0 is behind the scenes, not in the app's screens.
 
 ## Run it
 
-```bash
-cp stack.env.example stack.env   # optional: add SESSION_SECRET
-docker compose up -d --build
+Save this as `docker-compose.yml` and start it with Docker Compose:
+
+```yaml
+services:
+  setryx:
+    build: https://github.com/Underpath/setryx.git
+    image: setryx:latest
+    container_name: setryx
+    restart: unless-stopped
+    ports:
+      - "38471:38471"
+    environment:
+      # Set to true when a reverse proxy sits in front, so HTTPS and client IPs are detected.
+      TRUST_PROXY: "false"
+      # Public address, used in invite links. When set, the server only answers to this host
+      # (and ALLOWED_HOSTS), which blocks DNS-rebinding pages.
+      # BASE_URL: https://setryx.example.com
+      # Other names or addresses you open setryx by, comma separated.
+      # ALLOWED_HOSTS: 192.168.1.5,setryx.lan
+    volumes:
+      - setryx-data:/data
+      - setryx-images:/images
+
+volumes:
+  setryx-data:
+  setryx-images:
 ```
 
 Open `http://<your-server>:38471`. The first account you create becomes the admin. Sign-up then closes. To add people, go to **Settings → People and invites**, then either create accounts yourself or send invite links.
 
-Data lives in the `setryx-data` volume (`/data` in the container): the SQLite database, the generated session secret, database copies (`backups/`) and exercise photos if you turn them on (`exercise-images/`).
+Two volumes hold everything:
 
-### Update
-
-```bash
-git pull
-```
-
-```bash
-docker compose up -d --build
-```
-
-If an update changes the database, setryx first saves a copy of it as it was (see [Backups](#backups)).
-
-The exercise library comes from [free-exercise-db](https://github.com/yuhonas/free-exercise-db) (public domain).
+- `setryx-data` (`/data`): the SQLite database, the generated session secret and database copies (`backups/`).
+- `setryx-images` (`/images`): exercise photos, if you turn them on. They're kept apart so backups of your data don't carry them.
 
 ### Exercise photos (optional)
 
-Photos are off by default, and setryx contacts nothing outside your network until an admin turns them on under **Settings → Exercise photos**. Once on, each photo is downloaded from GitHub the first time someone opens that exercise. Downloads that redirect, pass 3 MB or aren't JPEGs are refused. Or use **Download all** to fetch every photo up front (about 100 MB). They're kept in `/data/exercise-images`, and **Remove downloaded photos** deletes them again. Your own exercises have no photos.
+The exercise library and its photos come from [free-exercise-db](https://github.com/yuhonas/free-exercise-db) (public domain). Photos are off by default, and setryx contacts nothing outside your network until an admin turns them on under **Settings → Exercise photos**. Once on, each photo is downloaded from that repository the first time someone opens that exercise. Downloads that redirect, pass 3 MB or aren't JPEGs are refused. Or use **Download all** to fetch every photo up front (about 100 MB). They're kept in the `/images` volume, and **Remove downloaded photos** deletes them again. Your own exercises have no photos.
 
 ### Configuration
 
-| Variable | Where | Default | What it does |
-|---|---|---|---|
-| `PORT` | compose | `38471` | Port the server listens on |
-| `TRUST_PROXY` | compose | `false` | Set `true` behind a reverse proxy, so HTTPS and client IPs are detected |
-| `COOKIE_SECURE` | compose | `auto` | `auto` marks cookies Secure when the proxy reports HTTPS or `BASE_URL` is `https://`; or `true` / `false` |
-| `BASE_URL` | compose | (unset) | Public address, e.g. `https://setryx.example.com`. Used in invite links, and the server only answers to its host (plus `ALLOWED_HOSTS`) |
-| `ALLOWED_HOSTS` | compose | (unset) | More names or addresses the server answers to, comma separated, e.g. `192.168.1.5,setryx.lan`. A name without a port matches any port |
-| `SESSION_SECRET` | `stack.env` | generated | Signs session cookies; at least 32 characters |
-
-Secrets go only in `stack.env`, which git ignores.
+| Variable | Default | What it does |
+|---|---|---|
+| `PORT` | `38471` | Port the server listens on |
+| `TRUST_PROXY` | `false` | Set `true` behind a reverse proxy, so HTTPS and client IPs are detected |
+| `COOKIE_SECURE` | `auto` | `auto` marks cookies Secure when the proxy reports HTTPS or `BASE_URL` is `https://`; or `true` / `false` |
+| `BASE_URL` | (unset) | Public address, e.g. `https://setryx.example.com`. Used in invite links, and the server only answers to its host (plus `ALLOWED_HOSTS`) |
+| `ALLOWED_HOSTS` | (unset) | More names or addresses the server answers to, comma separated, e.g. `192.168.1.5,setryx.lan`. A name without a port matches any port |
+| `SESSION_SECRET` | generated | Signs session cookies; at least 32 characters. Left unset, setryx generates one and keeps it in `/data` |
+| `IMAGES_DIR` | `/images` | Where downloaded exercise photos are kept |
 
 Set `BASE_URL` or `ALLOWED_HOSTS`. Then setryx turns away requests for any other host name, which stops a malicious web page from reaching a server on your network through its own name (DNS rebinding). Without either, the server logs a warning at startup. If you open setryx by more than one address, for example a public name and a LAN address, list them all.
 
 ### HTTPS (optional)
 
-setryx works over plain HTTP, including finishing a workout with no connection: sessions are kept on the phone and upload when the server is reachable again. With HTTPS, phones can also install setryx as an app, open it with no connection at all, and use the browser's own keep-screen-on feature. Two example proxies:
+setryx works over plain HTTP, including finishing a workout with no connection: sessions are kept on the device and upload when the server is reachable again. With HTTPS, devices can also install setryx as an app, open it with no connection at all, and use the browser's own keep-screen-on feature. Put any reverse proxy in front of port 38471.
 
-Caddy:
-```
-setryx.example.com {
-  reverse_proxy setryx:38471
-}
-```
-
-Traefik labels:
-```yaml
-labels:
-  - traefik.enable=true
-  - traefik.http.routers.setryx.rule=Host(`setryx.example.com`)
-  - traefik.http.routers.setryx.tls.certresolver=letsencrypt
-  - traefik.http.services.setryx.loadbalancer.server.port=38471
-```
 Set `TRUST_PROXY: "true"` and `BASE_URL` when using a proxy. With an `https://` `BASE_URL`, the session cookie is marked Secure and named `__Host-setryx_session`.
 
 Plain HTTP is fine on a network you trust. Don't expose it to the internet: passwords, the session cookie and API tokens would travel unencrypted.
 
 ### Backups
 
-Everything lives in the `/data` volume, so backing up that volume backs up setryx. A few things make that safe:
+Your data lives in the `/data` volume, so backing up that volume backs up setryx. A few things make that safe:
 
 - The database file, `setryx.db`, always holds every saved change on its own; there's no side file to copy along.
 - setryx also keeps complete copies in `/data/backups` that are always written in one go, so a backup tool can never catch one half-written:
-  - `setryx-latest.db`, refreshed every 15 minutes when something changed, and when the container stops;
+  - `setryx-latest.db`, refreshed once a day when something changed, and when the container stops;
   - `setryx-before-v<N>-<time>.db`, taken just before an update changes the database (the last 3 are kept).
 - An admin can change the folder, how many copies are kept and how often the up-to-date copy refreshes under **Settings → Backups**, and make a copy by hand. To keep copies outside the data volume, mount another volume and point the folder at it.
 
-Exercise photos (`/data/exercise-images`) aren't in the copies; they can always be downloaded again.
+Exercise photos are in their own `/images` volume, not in `/data` or the copies; they can always be downloaded again.
 
 To restore a copy:
 
@@ -137,7 +139,7 @@ A short burst up to a limit is fine. Going over a rate limit gets HTTP 429 with 
 
 **Known devices.** Someone guessing an account's password could otherwise keep its owner locked out. To prevent that, a browser that signs in with the password keeps a device cookie (`setryx_device`, signed, HttpOnly, for a year, and kept when you sign out). Sign-ins from a known device are counted on their own, so guessing from elsewhere doesn't lock it out. A device that has never signed in to that account waits until the guessing stops. Changing your password, **Sign out everywhere else**, an admin password reset, `reset-password` and turning the account off all forget the account's other devices. While an account's shared count is used up, the server logs a warning and admins see a notice on Today and under **People and invites**.
 
-A full storage allowance answers 507; deleting still works, and a session logged offline stays on the phone until there's room. Counts are kept in memory, so a restart resets them (`docker restart setryx` clears a lockout, though guessing that carries on fills the count again).
+A full storage allowance answers 507; deleting still works, and a session logged offline stays on the device until there's room. Counts are kept in memory, so a restart resets them (`docker restart setryx` clears a lockout, though guessing that carries on fills the count again).
 
 Everyone can see where they're signed in under **Settings → Account** and sign out any device.
 
