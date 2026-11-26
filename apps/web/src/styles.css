@@ -582,3 +582,8 @@ textarea.input { resize: vertical; min-height: 88px; line-height: 1.45; }
 .panel .data-table td, .panel .data-table th { border-color: var(--rule); }
 .panel-more { margin-top: 10px; width: 100%; }
 .panel .link-btn.small { margin-top: 6px; }
+
+.ex-photos { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 4px 0 6px; }
+.ex-photos figure { margin: 0; display: grid; gap: 4px; }
+.ex-photos img { width: 100%; aspect-ratio: 3 / 2; object-fit: cover; border-radius: 10px; background: var(--rule); display: block; }
+.ex-photos figcaption { font-size: .75rem; color: var(--muted); }

@@ -1,4 +1,6 @@
 import type { FastifyPluginAsync } from 'fastify';
+import { readFile } from 'node:fs/promises';
+import { join } from 'node:path';
 import { z } from 'zod';
 import { exerciseInputSchema } from '@setryx/shared';
 import { requireUser } from '../app.ts';
@@ -26,6 +28,18 @@ type IdParams = { Params: { id: string } };
 export const libraryRoutes: FastifyPluginAsync = async (app) => {
   const { db } = app;
   app.addHook('preHandler', async (req) => void requireUser(req));
+
+  // Exercise photos, served only if they've been placed in /data/exercise-images.
+  app.get<{ Params: { dir: string; file: string } }>('/exercise-images/:dir/:file', async (req, reply) => {
+    const { dir, file } = req.params;
+    if (!/^[A-Za-z0-9_()'.,-]{1,120}$/.test(dir) || dir.includes('..') || !/^\d{1,2}\.jpg$/.test(file)) throw new HttpError(404, 'not_found', 'No such image.');
+    try {
+      const data = await readFile(join(app.config.dataDir, 'exercise-images', dir, file));
+      return reply.header('Content-Type', 'image/jpeg').header('Cache-Control', 'private, max-age=604800').send(data);
+    } catch {
+      throw new HttpError(404, 'not_found', 'No such image.');
+    }
+  });
 
   app.get('/exercises', async (req) => {
     const q = parse(searchQuerySchema, req.query);

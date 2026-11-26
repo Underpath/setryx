@@ -20,6 +20,7 @@ import {
   stepsOf,
 } from '@setryx/shared';
 import { useMe } from '../session.ts';
+import { ExercisePhotos } from '../components/exercises.tsx';
 import { formatMinutes, useRoutines, useWorkout } from '../data.ts';
 import { pendingRuns, useOutbox } from '../sync/outbox.ts';
 import { FormError, Icon, Sheet, useToast } from '../components/ui.tsx';
@@ -89,7 +90,10 @@ function NewSession({ user, workoutId }: { user: PublicUser; workoutId: string }
     if (!w.data || !routinesSettled) return null;
     const ctx = picked ?? routineContextFor(workoutId, routines.data ?? [], new Date(), pendingRuns(outbox), user.settings.weekStart);
     const exercises: Record<string, SnapshotExercise> = {};
-    for (const [id, e] of Object.entries(w.data.exercises)) exercises[id] = { name: e.name, equipment: e.equipment, instructions: e.instructions };
+    for (const [id, e] of Object.entries(w.data.exercises)) exercises[id] = {
+      name: e.name, equipment: e.equipment, instructions: e.instructions,
+      images: e.images, primaryMuscles: e.primaryMuscles, secondaryMuscles: e.secondaryMuscles,
+    };
     const { workout } = w.data;
     return createPlayer({
       id: uid(), userId: user.id, workoutId: workout.id, workoutName: workout.name, icon: workout.icon,
@@ -271,8 +275,8 @@ function Player({ user, initial }: { user: PublicUser; initial: PlayerState }) {
           </>
         )}
       </div>
-      {!wide && step.kind === 'exercise' && (
-        <button className="icon-btn" type="button" aria-label="Form cues" onClick={() => setSheet('cues')}>
+      {step.kind === 'exercise' && (
+        <button className="icon-btn" type="button" aria-label="Exercise details" onClick={() => setSheet('cues')}>
           <svg className="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" /><path d="M12 11v6M12 7.5v.5" /></svg>
         </button>
       )}
@@ -459,15 +463,21 @@ function NextLine({ step, name }: { step: FlatStep | null; name?: string }) {
 }
 
 function CuesBlock({ step, exercise, compact }: { step: Extract<FlatStep, { kind: 'exercise' }>; exercise?: SnapshotExercise; compact?: boolean }) {
-  const equipment = step.equipmentNote ?? exercise?.equipment.join(', ');
+  const equipment = step.equipmentNote ?? exercise?.equipment.map((e) => e[0]!.toUpperCase() + e.slice(1)).join(', ');
   return (
     <div className={`cues-block${compact ? ' compact' : ''}`}>
+      {!compact && exercise?.images && exercise.images.length > 0 && <ExercisePhotos images={exercise.images} name={exercise.name} />}
+      {!compact && exercise?.primaryMuscles && exercise.primaryMuscles.length > 0 && (
+        <p className="small">
+          <b>Works:</b> {[...exercise.primaryMuscles, ...(exercise.secondaryMuscles ?? [])].map((m) => m[0]!.toUpperCase() + m.slice(1)).join(', ')}
+        </p>
+      )}
       {step.notes && <p>{step.notes}</p>}
       {!compact && equipment && <p className="small"><b>Equipment:</b> {equipment}</p>}
       {!compact && exercise && exercise.instructions.length > 0 && (
         <ol className="instructions">{exercise.instructions.map((s, i) => <li key={i}>{s}</li>)}</ol>
       )}
-      {!compact && !step.notes && !equipment && !exercise?.instructions.length && <p className="muted">No form cues for this exercise.</p>}
+      {!compact && !step.notes && !equipment && !exercise?.instructions.length && !exercise?.images?.length && <p className="muted">No details for this exercise.</p>}
     </div>
   );
 }

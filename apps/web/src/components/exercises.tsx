@@ -55,11 +55,29 @@ export function ExerciseBrowser({ onPick, pickLabel }: { onPick: (e: Exercise) =
   );
 }
 
+/** Start and end photos, when they're on the server. Missing ones just don't show. */
+export function ExercisePhotos({ images, name }: { images: string[]; name: string }) {
+  const [failed, setFailed] = useState<string[]>([]);
+  const shown = images.filter((p) => !failed.includes(p)).slice(0, 2);
+  if (!shown.length) return null;
+  return (
+    <div className="ex-photos">
+      {shown.map((p, i) => (
+        <figure key={p}>
+          <img src={`/api/v1/exercise-images/${p}`} alt={`${name}, ${i === 0 ? 'start' : 'end'} position`} loading="lazy" onError={() => setFailed((f) => [...f, p])} />
+          <figcaption>{i === 0 ? 'Start' : 'End'}</figcaption>
+        </figure>
+      ))}
+    </div>
+  );
+}
+
 export function ExerciseDetailSheet({ exercise, onClose, onEdit, onDuplicate }: { exercise: Exercise; onClose: () => void; onEdit?: () => void; onDuplicate?: () => void }) {
   return (
     <Sheet title={exercise.name} onClose={onClose}>
       {exerciseMeta(exercise) && <p className="muted">{exerciseMeta(exercise)}</p>}
       {exercise.secondaryMuscles.length > 0 && <p className="small muted">Also works: {exercise.secondaryMuscles.map(cap).join(', ')}</p>}
+      <ExercisePhotos images={exercise.images} name={exercise.name} />
       {exercise.instructions.length > 0 ? (
         <ol className="instructions">{exercise.instructions.map((s, i) => <li key={i}>{s}</li>)}</ol>
       ) : (

@@ -3,7 +3,15 @@
 import { type FlatStep, flattenWorkout } from './engine.ts';
 import type { SessionUpload, WorkoutItem } from './workouts.ts';
 
-export type SnapshotExercise = { name: string; equipment: string[]; instructions: string[] };
+export type SnapshotExercise = {
+  name: string;
+  equipment: string[];
+  instructions: string[];
+  /** For the info sheet in the player; absent in sessions started before they were kept. */
+  images?: string[];
+  primaryMuscles?: string[];
+  secondaryMuscles?: string[];
+};
 
 export type SetLog = {
   stepIndex: number;
