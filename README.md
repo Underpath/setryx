@@ -26,8 +26,7 @@ Save this as `docker-compose.yml` and start it with Docker Compose:
 ```yaml
 services:
   setryx:
-    build: https://github.com/Underpath/setryx.git
-    image: setryx:latest
+    image: ghcr.io/underpath/setryx:latest
     container_name: setryx
     restart: unless-stopped
     ports:
@@ -178,6 +177,8 @@ npm run dev
 ```
 
 The API runs on :38471 and Vite on :5173 (it proxies `/api`). Other commands: `npm test` runs the shared logic and API tests, `npm run typecheck` checks types, and `npm run build` builds the web app into `apps/web/dist`, which the server serves.
+
+Every push to `main` runs the tests and publishes `ghcr.io/underpath/setryx:latest` (see `.github/workflows/docker.yml`). A tag like `v1.0.0` also publishes `1.0.0`, `1.0` and `1`, and pull requests are tested and built without publishing.
 
 Layout: `apps/server` (Fastify + built-in `node:sqlite`), `apps/web` (React + Vite, installable as an app), `packages/shared` (schemas and the logic used by both: the workout player, routines and stats), `e2e` (the browser test).
 
