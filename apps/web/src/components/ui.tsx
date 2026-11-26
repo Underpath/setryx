@@ -89,7 +89,8 @@ export function Sheet({ title, onClose, children }: { title: string; onClose: ()
       body?.querySelector<HTMLElement>('[data-autofocus]') ??
       body?.querySelector<HTMLElement>(':scope > :not(.sheet-head) input:not([type=checkbox]):not([type=hidden]), :scope > :not(.sheet-head) textarea, :scope > :not(.sheet-head) select, :scope > input, :scope > form input') ??
       body?.querySelector<HTMLElement>(':scope > button, :scope > :not(.sheet-head) button');
-    target?.focus();
+    // Without scrolling: a long sheet should still open at the top.
+    target?.focus({ preventScroll: true });
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
     document.addEventListener('keydown', onKey);
     return () => {
