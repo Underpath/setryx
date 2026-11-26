@@ -163,7 +163,7 @@ export const limitSettingsSchema = z.object({
 });
 export type LimitSettings = z.infer<typeof limitSettingsSchema>;
 export const defaultLimitSettings: LimitSettings = { tokenPerMinute: 120, signInPerMinute: 10, maxTokensPerUser: 5,
-  sessionIdleDays: 30, sessionMaxDays: 90, maxSessionsPerUser: 20, storageMbPerUser: 100,
+  sessionIdleDays: 30, sessionMaxDays: 90, maxSessionsPerUser: 5, storageMbPerUser: 100,
 };
 
 /** One place someone is signed in, as listed in their account settings. */

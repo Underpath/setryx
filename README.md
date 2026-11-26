@@ -128,7 +128,7 @@ An admin sets these under **Settings → Limits**. They take effect straight awa
 | Wrong passwords a minute for each account | 10 | signing in, changing a password and creating a token. Counted per account rather than per address, so a proxy doesn't affect it |
 | Days a sign-in lasts without use | 30 | after that, that device is signed out |
 | Days a sign-in lasts at most | 90 | everyone signs in again this long after signing in; can be turned off |
-| Devices each person can be signed in on | 20 | signing in on one more signs out the device used longest ago |
+| Devices each person can be signed in on | 5 | signing in on one more signs out the device used longest ago |
 | Requests a minute for each token | 120 | the API and MCP together; can be turned off |
 | Tokens each person can have | 5 | lowering it keeps existing tokens |
 | Storage for each person | 100 MB | workouts, routines, own exercises and sessions; can be turned off |
