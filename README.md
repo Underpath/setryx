@@ -1,4 +1,4 @@
-# setryx
+# Setryx
 
 A self-hosted workout tracker for one household or a group of friends. It runs as a single Docker container serving plain HTTP. If you want HTTPS, put your own reverse proxy in front.
 
@@ -6,7 +6,7 @@ What it does:
 
 - **Workouts:** build them from a library of 876 exercises plus your own, with sets, reps, weights, timed holds, rests and supersets.
 - **Player:** a full-screen guide through the workout, with timers, sounds and voice cues. It keeps the screen on and picks up where you left off after a reload.
-- **Review:** check what you did after each workout. setryx suggests new targets and updates the workout if you agree.
+- **Review:** check what you did after each workout. Setryx suggests new targets and updates the workout if you agree.
 - **Offline:** finish a workout with no connection; it uploads when the server is reachable again.
 - **Routines:** a rotation (Push A, Pull A, …), a one-off programme, or a weekly plan. Today shows what's up next.
 - **Stats:** a streak, a calendar, sessions per week, and charts and records for each exercise.
@@ -18,8 +18,6 @@ What it does:
   <img src="docs/screenshots/exercise.png" alt="An exercise from the library with start and end photos and step-by-step instructions" width="260">
   <img src="docs/screenshots/stats.png" alt="Stats: a 7-week streak, a training calendar and sessions per week" width="260">
 </p>
-
-Status: working towards v1.0. Everything above works; the remaining work before v1.0 is behind the scenes, not in the app's screens.
 
 ## Run it
 
@@ -40,7 +38,7 @@ services:
       # Public address, used in invite links. When set, the server only answers to this host
       # (and ALLOWED_HOSTS), which blocks DNS-rebinding pages.
       # BASE_URL: https://setryx.example.com
-      # Other names or addresses you open setryx by, comma separated.
+      # Other names or addresses you open Setryx by, comma separated.
       # ALLOWED_HOSTS: 192.168.1.5,setryx.lan
     volumes:
       - setryx-data:/data
@@ -60,7 +58,7 @@ Two volumes hold everything:
 
 ### Exercise photos (optional)
 
-The exercise library and its photos come from [free-exercise-db](https://github.com/yuhonas/free-exercise-db) (public domain). Photos are off by default, and setryx contacts nothing outside your network until an admin turns them on under **Settings → Exercise photos**. Once on, each photo is downloaded from that repository the first time someone opens that exercise. Downloads that redirect, pass 3 MB or aren't JPEGs are refused. Or use **Download all** to fetch every photo up front (about 100 MB). They're kept in the `/images` volume, and **Remove downloaded photos** deletes them again. Your own exercises have no photos.
+The exercise library and its photos come from [free-exercise-db](https://github.com/yuhonas/free-exercise-db) (public domain). Photos are off by default, and Setryx contacts nothing outside your network until an admin turns them on under **Settings → Exercise photos**. Once on, each photo is downloaded from that repository the first time someone opens that exercise. Downloads that redirect, pass 3 MB or aren't JPEGs are refused. Or use **Download all** to fetch every photo up front (about 100 MB). They're kept in the `/images` volume, and **Remove downloaded photos** deletes them again. Your own exercises have no photos.
 
 ### Configuration
 
@@ -71,14 +69,14 @@ The exercise library and its photos come from [free-exercise-db](https://github.
 | `COOKIE_SECURE` | `auto` | `auto` marks cookies Secure when the proxy reports HTTPS or `BASE_URL` is `https://`; or `true` / `false` |
 | `BASE_URL` | (unset) | Public address, e.g. `https://setryx.example.com`. Used in invite links, and the server only answers to its host (plus `ALLOWED_HOSTS`) |
 | `ALLOWED_HOSTS` | (unset) | More names or addresses the server answers to, comma separated, e.g. `192.168.1.5,setryx.lan`. A name without a port matches any port |
-| `SESSION_SECRET` | generated | Signs session cookies; at least 32 characters. Left unset, setryx generates one and keeps it in `/data` |
+| `SESSION_SECRET` | generated | Signs session cookies; at least 32 characters. Left unset, Setryx generates one and keeps it in `/data` |
 | `IMAGES_DIR` | `/images` | Where downloaded exercise photos are kept |
 
-Set `BASE_URL` or `ALLOWED_HOSTS`. Then setryx turns away requests for any other host name, which stops a malicious web page from reaching a server on your network through its own name (DNS rebinding). Without either, the server logs a warning at startup. If you open setryx by more than one address, for example a public name and a LAN address, list them all.
+Set `BASE_URL` or `ALLOWED_HOSTS`. Then Setryx turns away requests for any other host name, which stops a malicious web page from reaching a server on your network through its own name (DNS rebinding). Without either, the server logs a warning at startup. If you open Setryx by more than one address, for example a public name and a LAN address, list them all.
 
 ### HTTPS (optional)
 
-setryx works over plain HTTP, including finishing a workout with no connection: sessions are kept on the device and upload when the server is reachable again. With HTTPS, devices can also install setryx as an app, open it with no connection at all, and use the browser's own keep-screen-on feature. Put any reverse proxy in front of port 38471.
+Setryx works over plain HTTP, including finishing a workout with no connection: sessions are kept on the device and upload when the server is reachable again. With HTTPS, devices can also install Setryx as an app, open it with no connection at all, and use the browser's own keep-screen-on feature. Put any reverse proxy in front of port 38471.
 
 Set `TRUST_PROXY: "true"` and `BASE_URL` when using a proxy. With an `https://` `BASE_URL`, the session cookie is marked Secure and named `__Host-setryx_session`.
 
@@ -86,10 +84,10 @@ Plain HTTP is fine on a network you trust. Don't expose it to the internet: pass
 
 ### Backups
 
-Your data lives in the `/data` volume, so backing up that volume backs up setryx. A few things make that safe:
+Your data lives in the `/data` volume, so backing up that volume backs up Setryx. A few things make that safe:
 
 - The database file, `setryx.db`, always holds every saved change on its own; there's no side file to copy along.
-- setryx also keeps complete copies in `/data/backups` that are always written in one go, so a backup tool can never catch one half-written:
+- Setryx also keeps complete copies in `/data/backups` that are always written in one go, so a backup tool can never catch one half-written:
   - `setryx-latest.db`, refreshed once a day when something changed, and when the container stops;
   - `setryx-before-v<N>-<time>.db`, taken just before an update changes the database (the last 3 are kept).
 - An admin can change the folder, how many copies are kept and how often the up-to-date copy refreshes under **Settings → Backups**, and make a copy by hand. To keep copies outside the data volume, mount another volume and point the folder at it.
@@ -135,7 +133,7 @@ An admin sets these under **Settings → Limits**. They take effect straight awa
 | Tokens each person can have | 5 | lowering it keeps existing tokens |
 | Storage for each person | 100 MB | workouts, routines, own exercises and sessions; can be turned off |
 
-A short burst up to a limit is fine. Going over a rate limit gets HTTP 429 with a `Retry-After` header, and API responses carry `RateLimit-Limit` and `RateLimit-Remaining`. Once an account reaches its wrong-password limit, signing in to it waits a few seconds between tries, even with the right password.
+A short burst up to a limit is fine. Going over a rate limit gets HTTP 429 with a `Retry-After` header, and API responses carry `RateLimit-Limit` and `RateLimit-Remaining`. Once an account reaches its wrong-password limit, signing in to it waits a few seconds between tries, even with the right password. A username that doesn't exist never gets a real password check: the answer just takes about as long as one would, so a flood of made-up names can't slow sign-ins down or show which names exist. A few places in the password-check queue are also kept for devices that have signed in before and for people already signed in.
 
 **Known devices.** Someone guessing an account's password could otherwise keep its owner locked out. To prevent that, a browser that signs in with the password keeps a device cookie (`setryx_device`, signed, HttpOnly, for a year, and kept when you sign out). Sign-ins from a known device are counted on their own, so guessing from elsewhere doesn't lock it out. A device that has never signed in to that account waits until the guessing stops. Changing your password, **Sign out everywhere else**, an admin password reset, `reset-password` and turning the account off all forget the account's other devices. While an account's shared count is used up, the server logs a warning and admins see a notice on Today and under **People and invites**.
 
@@ -143,11 +141,11 @@ A full storage allowance answers 507; deleting still works, and a session logged
 
 Everyone can see where they're signed in under **Settings → Account** and sign out any device.
 
-**Shared devices.** Signing out deletes what your account keeps on that device: an unfinished workout, finished ones waiting to be saved, anything not yet synced, and the offline copy of your workouts. If some of it hasn't reached the server, setryx tries to send it first and asks before deleting what's left. When a session ends without signing out (it expired, you signed it out from another device, or the account was turned off), the offline copy goes, but unsynced workouts stay so they sync when you sign in again. Nobody else signing in on that device sees them.
+**Shared devices.** Signing out deletes what your account keeps on that device: an unfinished workout, finished ones waiting to be saved, anything not yet synced, and the offline copy of your workouts. If some of it hasn't reached the server, Setryx tries to send it first and asks before deleting what's left. When a session ends without signing out (it expired, you signed it out from another device, or the account was turned off), the offline copy goes, but unsynced workouts stay so they sync when you sign in again. Nobody else signing in on that device sees them.
 
 ### AI agents (MCP)
 
-Agents like Claude can connect to setryx over MCP at `http://<your-server>:38471/mcp`, signing in with an API token. For example, in Claude Code:
+Agents like Claude can connect to Setryx over MCP at `http://<your-server>:38471/mcp`, signing in with an API token. For example, in Claude Code:
 
 ```bash
 claude mcp add --transport http setryx http://<your-server>:38471/mcp --header "Authorization: Bearer setryx_…"
@@ -185,14 +183,14 @@ Layout: `apps/server` (Fastify + built-in `node:sqlite`), `apps/web` (React + Vi
 
 ### End-to-end test
 
-A full workout (first-run setup, playing a workout, the review, saving, Stats) runs in a real browser, entirely in containers: a throwaway setryx built from the current code with an empty database, and Microsoft's Playwright image with Chromium. Nothing is installed on your machine.
+A full workout (first-run setup, playing a workout, the review, saving, Stats) runs in a real browser, entirely in containers: a throwaway Setryx built from the current code with an empty database, and Microsoft's Playwright image with Chromium. Nothing is installed on your machine.
 
 ```bash
 sh e2e/run.sh
 ```
 
-It starts from an empty database every time and removes the test copy of setryx when it's done. The Playwright image is a large one-off download (Docker lists it at about 3.5 GB); remove it with `docker rmi mcr.microsoft.com/playwright:v1.55.0-noble` when you no longer need it.
+It starts from an empty database every time and removes the test copy of Setryx when it's done. The Playwright image is a large one-off download (Docker lists it at about 3.5 GB); remove it with `docker rmi mcr.microsoft.com/playwright:v1.55.0-noble` when you no longer need it.
 
 ## License
 
-setryx is under the [MIT License](LICENSE). The exercise library comes from [free-exercise-db](https://github.com/yuhonas/free-exercise-db), which is public domain. The fonts are under the SIL Open Font License, and the other packages setryx ships are listed with their licenses in [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md). After changing dependencies, regenerate that file with `node scripts/third-party-licenses.mjs`.
+Setryx is under the [MIT License](LICENSE). The exercise library comes from [free-exercise-db](https://github.com/yuhonas/free-exercise-db), which is public domain. The fonts are under the SIL Open Font License, and the other packages Setryx ships are listed with their licenses in [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md). After changing dependencies, regenerate that file with `node scripts/third-party-licenses.mjs`.

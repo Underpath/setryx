@@ -4,6 +4,7 @@ import { openDb } from './db.ts';
 import { purgeExpiredSessions } from './sessions.ts';
 import { purgeOldDevices } from './devices.ts';
 import { moveOldImages } from './exercise-images.ts';
+import { warmUp } from './passwords.ts';
 
 const config = loadConfig();
 const db = openDb(config.dataDir);
@@ -12,6 +13,8 @@ const app = await buildApp(config, db, { logger: true });
 purgeExpiredSessions(db);
 purgeOldDevices(db);
 moveOldImages(config.dataDir, config.imagesDir, (msg) => app.log.info(msg));
+// Times one real password check, so sign-ins with unknown names take as long as real ones.
+void warmUp();
 // setryx-latest.db: a complete copy for volume backups, refreshed when something changed.
 app.backups.start();
 const purgeTimer = setInterval(() => (purgeExpiredSessions(db), purgeOldDevices(db)), 6 * 3_600_000);

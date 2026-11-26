@@ -5,7 +5,8 @@ import { knownDevice } from '../devices.ts';
 import { tx } from '../db.ts';
 import { HttpError, parse } from '../http.ts';
 import { findOpenInvite, markInviteUsed } from '../invites.ts';
-import { dummyVerify, hashPassword, verifyPassword } from '../passwords.ts';
+import { hashPassword, pretendVerify, verifyPassword } from '../passwords.ts';
+import { sha256 } from '../sessions.ts';
 import { createSession, deleteSession } from '../sessions.ts';
 import { countUsers, findUserByUsername, getOpenSignup, insertUser, toPublic } from '../users.ts';
 
@@ -36,14 +37,15 @@ export const authRoutes: FastifyPluginAsync = async (app) => {
   app.post('/auth/login', async (req, reply) => {
     const body = parse(loginRequestSchema, req.body);
     const user = findUserByUsername(db, body.username);
-    // Unknown names are counted too, so a refusal doesn't reveal which accounts exist.
-    const account = user ? user.id : `name:${body.username.trim().toLowerCase()}`;
+    // Unknown names are counted too, so a refusal doesn't reveal which accounts
+    // exist. They share 65,536 counts, so a flood of made-up names can't grow memory.
+    const account = user ? user.id : `name:${parseInt(sha256(body.username.trim().toLowerCase()).slice(0, 4), 16)}`;
     // A browser that has signed in to this account before has its own count, so
     // strangers using up the account's shared one can't lock its owner out.
     const deviceId = user ? deviceIdOf(req) : null;
     const known = user && deviceId ? knownDevice(db, deviceId, user.id) : null;
     const refund = known ? reservePasswordAttempt(req, reply, `${user!.id}:device:${known}`) : reservePasswordAttempt(req, reply, account, user?.id);
-    const ok = user ? await verifyPassword(body.password, user.passwordHash) : await dummyVerify(body.password);
+    const ok = user ? await verifyPassword(body.password, user.passwordHash, { priority: !!known }) : await pretendVerify();
     // The password is always checked, and a turned-off account gets the same
     // answer as a wrong password, so neither timing nor wording tells them apart.
     if (!user || !ok || user.disabled) throw new HttpError(401, 'bad_credentials', 'That username and password don’t match.');

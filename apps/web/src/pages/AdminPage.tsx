@@ -182,7 +182,7 @@ export function InvitesSection() {
           <h2 className="h3">Invite links</h2>
           <button className="btn btn-quiet btn-sm" type="button" onClick={() => create.mutate()} disabled={create.isPending}>New invite link</button>
         </div>
-        <p className="muted small" style={{ marginBottom: 10 }}>Each link creates one account and works for 7 days. Send it however you like; setryx doesn’t send email.</p>
+        <p className="muted small" style={{ marginBottom: 10 }}>Each link creates one account and works for 7 days. Send it however you like; Setryx doesn’t send email.</p>
         <ul className="rows">
           {invites.data?.invites.length === 0 && <li className="row"><span className="muted">No invite links yet.</span></li>}
           {invites.data?.invites.map((i) => (

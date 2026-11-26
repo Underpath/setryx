@@ -20,7 +20,7 @@ export const tokenRoutes: FastifyPluginAsync = async (app) => {
     const { password, ...body } = parse(createApiTokenRequestSchema, req.body);
     // A token outlives sessions, so making one asks for the password, not just an open session.
     const refund = reservePasswordAttempt(req, reply, sessionBucket(req));
-    if (!(await verifyPassword(password, req.user!.passwordHash))) {
+    if (!(await verifyPassword(password, req.user!.passwordHash, { priority: true }))) {
       throw new HttpError(400, 'invalid_input', 'Your password is wrong.', { password: 'This password is wrong.' });
     }
     refund();

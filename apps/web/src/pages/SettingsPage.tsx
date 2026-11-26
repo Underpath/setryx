@@ -164,7 +164,7 @@ function BackupsSection() {
   return (
     <>
       <p className="muted small" style={{ maxWidth: '62ch', marginBottom: 6 }}>
-        setryx keeps complete copies of its database here for your own volume backups to pick up. Every copy is written in one go, so it’s always safe to copy. Exercise
+        Setryx keeps complete copies of its database here for your own volume backups to pick up. Every copy is written in one go, so it’s always safe to copy. Exercise
         photos aren’t included; they can be downloaded again.
       </p>
       <ul className="rows">

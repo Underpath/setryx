@@ -69,7 +69,7 @@ export const workoutRoutes: FastifyPluginAsync = async (app) => {
 
   const parseOr400 = (data: unknown) => {
     const parsed = parseRoutineExport(data);
-    if (!parsed) throw new HttpError(400, 'unreadable_file', 'That file has no routines setryx can read. Pick a routines export in JSON format.');
+    if (!parsed) throw new HttpError(400, 'unreadable_file', 'That file has no routines Setryx can read. Pick a routines export in JSON format.');
     return parsed;
   };
 

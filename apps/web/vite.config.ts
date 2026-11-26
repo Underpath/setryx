@@ -14,8 +14,8 @@ export default defineConfig({
       injectRegister: 'script-defer',
       includeAssets: ['icon.svg', 'apple-touch-icon.png'],
       manifest: {
-        name: 'setryx',
-        short_name: 'setryx',
+        name: 'Setryx',
+        short_name: 'Setryx',
         description: 'Your workouts, on your own server.',
         theme_color: '#1C2126',
         background_color: '#1C2126',

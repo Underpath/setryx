@@ -50,7 +50,7 @@ export function ApiTokensSection({ user }: { user: PublicUser }) {
           <button className="btn btn-quiet btn-sm" type="button" onClick={() => setCreating(true)}>New token</button>
         </div>
         <p className="muted small" style={{ marginBottom: 10 }}>
-          Let a script or an AI agent use your setryx data. A token can read your exercises, workouts, routines, sessions and stats; with write access it can also
+          Let a script or an AI agent use your Setryx data. A token can read your exercises, workouts, routines, sessions and stats; with write access it can also
           create, change and delete them. It can’t change your account or password, other people’s data, or server settings.{' '}
           <a href="/api/v1/openapi.json" target="_blank" rel="noreferrer">Open the API spec</a>
         </p>
@@ -196,7 +196,7 @@ function McpSection({ user, enabled }: { user: PublicUser; enabled: boolean }) {
     <section className="section">
       <h2 className="h3">AI agents (MCP)</h2>
       <p className="muted small" style={{ marginBottom: 10 }}>
-        Agents like Claude can connect to setryx over MCP and use your data in conversation: what’s next, your history, building workouts and routines,
+        Agents like Claude can connect to Setryx over MCP and use your data in conversation: what’s next, your history, building workouts and routines,
         logging a session. They sign in with one of your tokens, so they can do exactly what that token allows. Clients that ask before changes will ask
         before deleting anything.
       </p>

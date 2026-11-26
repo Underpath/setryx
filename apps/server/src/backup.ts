@@ -35,7 +35,7 @@ export function checkFolder(dir: string): void {
     writeFileSync(probe, 'ok');
     rmSync(probe, { force: true });
   } catch {
-    throw new Error(`setryx can’t write to ${dir}. Check the folder exists in the container and the setryx user can write to it.`);
+    throw new Error(`Setryx can’t write to ${dir}. Check the folder exists in the container and Setryx can write to it.`);
   }
 }
 

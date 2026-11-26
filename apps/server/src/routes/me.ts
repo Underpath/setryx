@@ -25,7 +25,7 @@ export const meRoutes: FastifyPluginAsync = async (app) => {
     const user = requireUser(req);
     const body = parse(changePasswordRequestSchema, req.body);
     const refund = reservePasswordAttempt(req, reply, sessionBucket(req));
-    if (!(await verifyPassword(body.currentPassword, user.passwordHash))) {
+    if (!(await verifyPassword(body.currentPassword, user.passwordHash, { priority: true }))) {
       throw new HttpError(400, 'invalid_input', 'Your current password is wrong.', { currentPassword: 'This password is wrong.' });
     }
     refund();

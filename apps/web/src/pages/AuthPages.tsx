@@ -10,7 +10,7 @@ function AuthLayout({ tagline, children }: { tagline: string; children: ReactNod
   return (
     <div className="auth">
       <div className="auth-band">
-        <div className="wordmark">setryx</div>
+        <div className="wordmark">Setryx</div>
         <p>{tagline}</p>
       </div>
       <main className="auth-body">{children}</main>

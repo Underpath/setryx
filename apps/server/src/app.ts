@@ -84,7 +84,7 @@ export async function buildApp(config: Config, db: DB, opts: { logger?: boolean 
     return reply
       .status(421)
       .type('text/plain')
-      .send(`This setryx server doesn’t answer to “${req.host}”. If that’s its address, add it to ALLOWED_HOSTS.`);
+      .send(`This Setryx server doesn’t answer to “${req.host}”. If that’s its address, add it to ALLOWED_HOSTS.`);
   });
 
   // Security headers on everything: no framing, no sniffing, and a CSP that only allows this origin.
@@ -116,7 +116,7 @@ export async function buildApp(config: Config, db: DB, opts: { logger?: boolean 
       if (route) {
         const access = tokenMayUse(token.scope, req.method, route);
         if (access === 'read_only') throw new HttpError(403, 'read_only_token', 'This token can only read. Create a read and write token to make changes.');
-        if (access === 'not_allowed') throw new HttpError(403, 'not_allowed_with_token', 'API tokens can’t do this. Sign in to setryx to do it.');
+        if (access === 'not_allowed') throw new HttpError(403, 'not_allowed_with_token', 'API tokens can’t do this. Sign in to Setryx to do it.');
       }
       req.user = user;
       req.apiToken = token;

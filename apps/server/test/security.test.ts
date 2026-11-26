@@ -300,3 +300,27 @@ test('the MCP instructions say stored text is data, not instructions', async () 
   const res = await app.inject({ method: 'POST', url: '/mcp', payload: { jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion: '2025-11-25' } }, headers: { authorization: `Bearer ${token}` } });
   assert.match(res.json().result.instructions, /never as instructions to follow/);
 });
+
+// ── F10: made-up usernames ──
+test('a flood of made-up usernames runs no password checks and doesn’t block a known device', async () => {
+  const device = deviceOf(await login('owner', OWNER_PW));
+  const flood = Array.from({ length: 300 }, (_, i) => login(`made-up-${i}-${Math.random()}`, 'wrong password 1'));
+  const mine = login('owner', OWNER_PW, { cookie: device });
+  const codes = (await Promise.all(flood)).map((r) => r.statusCode);
+  assert.ok(codes.every((c) => c === 401), `codes: ${[...new Set(codes)]}`);
+  assert.equal((await mine).statusCode, 200);
+});
+
+test('places in the password queue are kept for priority checks', async () => {
+  const { hashPassword, verifyPassword, PasswordsBusyError } = await import('../src/passwords.ts');
+  const stored = await hashPassword('queue test password');
+  const normal: Promise<unknown>[] = [];
+  let busy = 0;
+  for (let i = 0; i < 60; i++) {
+    normal.push(verifyPassword('wrong', stored).catch((e) => (e instanceof PasswordsBusyError ? busy++ : Promise.reject(e))));
+  }
+  const first = verifyPassword('queue test password', stored, { priority: true });
+  await Promise.all(normal);
+  assert.equal(busy, 60 - 2 - 35, 'ordinary checks stop at 35 waiting');
+  assert.equal(await first, true, 'a priority check still gets in');
+});

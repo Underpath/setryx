@@ -19,7 +19,7 @@ services:
       # Public address, used in invite links. When set, the server only answers to this host
       # (and ALLOWED_HOSTS), which blocks DNS-rebinding pages.
       # BASE_URL: https://setryx.example.com
-      # Other names or addresses you open setryx by, comma separated.
+      # Other names or addresses you open Setryx by, comma separated.
       # ALLOWED_HOSTS: 192.168.1.5,setryx.lan
     volumes:
       - setryx-data:/data

@@ -34,7 +34,7 @@ function HttpsNotice() {
     <div className="notice" role="note">
       <p>
         <strong>You’re on plain HTTP</strong>
-        Workouts work fine. Putting setryx behind an HTTPS reverse proxy also lets you open the app with no connection, and uses the browser’s
+        Workouts work fine. Putting Setryx behind an HTTPS reverse proxy also lets you open the app with no connection, and uses the browser’s
         own keep-screen-on feature.
       </p>
       <button className="btn" type="button" onClick={dismiss}>Got it</button>

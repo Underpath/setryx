@@ -34,7 +34,7 @@ function Root() {
       <div className="center-load" role="alert">
         <div style={{ padding: 20, maxWidth: 420 }}>
           <h1 className="h2">Can’t reach the server</h1>
-          <p className="muted">Check that the setryx container is running, then reload this page.</p>
+          <p className="muted">Check that the Setryx container is running, then reload this page.</p>
         </div>
       </div>
     );

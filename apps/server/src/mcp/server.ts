@@ -26,7 +26,7 @@ export function setMcpEnabled(db: DB, enabled: boolean): void {
   db.prepare('INSERT INTO app_settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value').run(KEY, String(enabled));
 }
 
-const INSTRUCTIONS = `setryx is a workout tracker. These tools read and change the signed-in person's own exercises, workouts, routines and sessions.
+const INSTRUCTIONS = `Setryx is a workout tracker. These tools read and change the signed-in person's own exercises, workouts, routines and sessions.
 - Weights are kilograms. A dumbbell weight is the weight of one dumbbell.
 - Exercises, workouts and routines can be named instead of given by id; when a name is unclear the tool suggests close matches.
 - A workout is a list of steps: exercises (one set each, or "sets" for straight sets), rests, and supersets repeated for several rounds.
@@ -68,7 +68,7 @@ export const mcpRoutes: FastifyPluginAsync = async (app) => {
         return result(id, {
           protocolVersion: PROTOCOL_VERSIONS.includes(asked) ? asked : PROTOCOL_VERSIONS[0],
           capabilities: { tools: { listChanged: false } },
-          serverInfo: { name: 'setryx', title: 'setryx', version: VERSION },
+          serverInfo: { name: 'setryx', title: 'Setryx', version: VERSION },
           instructions: INSTRUCTIONS,
         });
       }
@@ -81,7 +81,7 @@ export const mcpRoutes: FastifyPluginAsync = async (app) => {
         const tool = toolsFor(ctx.scope).find((t) => t.name === name);
         if (!tool) {
           const exists = toolsFor('write').some((t) => t.name === name);
-          return exists ? result(id, toolText('This token can only read. Create a read and write token in setryx to make changes.', true)) : rpcError(id, -32602, `Unknown tool: ${name}`);
+          return exists ? result(id, toolText('This token can only read. Create a read and write token in Setryx to make changes.', true)) : rpcError(id, -32602, `Unknown tool: ${name}`);
         }
         const args = tool.input.safeParse(msg.params?.arguments ?? {});
         if (!args.success) return result(id, toolText(validationMessage(args.error), true));
@@ -90,7 +90,7 @@ export const mcpRoutes: FastifyPluginAsync = async (app) => {
         } catch (err) {
           if (err instanceof ToolError) return result(id, toolText(err.message, true));
           req.log.error(err);
-          return result(id, toolText('Something went wrong on the setryx server. Check its logs.', true));
+          return result(id, toolText('Something went wrong on the Setryx server. Check its logs.', true));
         }
       }
       default:
@@ -99,14 +99,14 @@ export const mcpRoutes: FastifyPluginAsync = async (app) => {
   }
 
   app.post('/mcp', async (req, reply) => {
-    if (!mcpEnabled(db)) return deny(reply, 404, 'MCP is turned off on this setryx server. An admin can turn it on in Settings → API and AI agents.');
+    if (!mcpEnabled(db)) return deny(reply, 404, 'MCP is turned off on this Setryx server. An admin can turn it on in Settings → API and AI agents.');
     // Browsers send Origin; refuse other sites (DNS rebinding). Agents send none.
     if (!isSameOrigin(req)) return deny(reply, 403, 'Requests from other sites are blocked.');
 
     const m = /^Bearer\s+(\S+)$/i.exec(req.headers.authorization ?? '');
     const token = m ? resolveApiToken(db, m[1]!) : null;
     const user = token ? findUserById(db, token.userId) : null;
-    if (!token || !user || user.disabled) return deny(reply, 401, 'Send a setryx API token as “Authorization: Bearer <token>”. Create one in Settings → API and AI agents.');
+    if (!token || !user || user.disabled) return deny(reply, 401, 'Send a Setryx API token as “Authorization: Bearer <token>”. Create one in Settings → API and AI agents.');
 
     // Each message counts against the token's limit, so a batch can't get round it.
     const body = req.body as RpcRequest | RpcRequest[];

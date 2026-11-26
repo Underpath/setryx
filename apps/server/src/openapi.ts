@@ -290,7 +290,7 @@ export function openApiDocument(): Json {
   return {
     openapi: '3.1.0',
     info: {
-      title: 'setryx API',
+      title: 'Setryx API',
       version: '1',
       description:
         'Your own training data: exercises, workouts, routines, sessions and stats. Authenticate with a personal API token from Settings → API and AI agents, sent as `Authorization: Bearer <token>`. A read-only token can use every GET; a read and write token can also create, change and delete. Tokens can’t sign in, change account or server settings, or manage other tokens. Each token may make a set number of requests a minute (the server’s admin chooses it); responses carry `RateLimit-Limit` and `RateLimit-Remaining`, and a 429 carries `Retry-After`.',
