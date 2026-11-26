@@ -49,7 +49,7 @@ export function ApiTokensSection({ user }: { user: PublicUser }) {
         <p className="muted small" style={{ marginBottom: 10 }}>
           Let a script or an AI agent use your setryx data. A token can read your exercises, workouts, routines, sessions and stats; with write access it can also
           create, change and delete them. It can’t change your account or password, other people’s data, or server settings.{' '}
-          <a href="/api/v1/openapi.json" target="_blank" rel="noreferrer">What the API can do</a>
+          <a href="/api/v1/openapi.json" target="_blank" rel="noreferrer">Open the API spec</a>
         </p>
         <FormError error={tokens.error} />
         <ul className="rows">
@@ -63,7 +63,7 @@ export function ApiTokensSection({ user }: { user: PublicUser }) {
         </ul>
       </section>
 
-      <McpSection user={user} enabled={tokens.data?.mcpEnabled ?? true} />
+      <McpSection user={user} enabled={tokens.data?.mcpEnabled ?? false} />
 
       {creating && (
         <NewTokenSheet
@@ -190,7 +190,7 @@ function McpSection({ user, enabled }: { user: PublicUser; enabled: boolean }) {
           <li className="row">
             <Switch
               label="Allow MCP on this server"
-              hint="For everyone with a token. Turning it off leaves the API and tokens working."
+              hint="Off by default. When on, anyone with a token can connect an agent; when off, the API and tokens still work."
               checked={enabled}
               onChange={(v) => toggle.mutate(v)}
             />
@@ -217,7 +217,7 @@ function McpSection({ user, enabled }: { user: PublicUser; enabled: boolean }) {
           </div>
         </div>
       ) : (
-        <p className="muted small">{user.role === 'admin' ? 'MCP is off. The API still works with tokens.' : 'An admin has turned MCP off on this server. The API still works with tokens.'}</p>
+        <p className="muted small">{user.role === 'admin' ? 'MCP is off. Turn it on above to connect agents. The API works with tokens either way.' : 'MCP is off on this server; an admin can turn it on. The API works with tokens either way.'}</p>
       )}
     </section>
   );

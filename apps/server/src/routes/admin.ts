@@ -149,7 +149,7 @@ export const adminRoutes: FastifyPluginAsync = async (app) => {
   });
 
   // ── Server settings ──
-  // MCP access for AI agents (with personal tokens); on unless turned off.
+  // MCP access for AI agents (with personal tokens); off until an admin turns it on.
   app.get('/mcp', async () => ({ enabled: mcpEnabled(db) }));
   app.patch('/mcp', async (req) => {
     const { enabled } = parse(z.object({ enabled: z.boolean() }), req.body);

@@ -53,6 +53,7 @@ beforeEach(async () => {
   cookie = cookieOf(await app.inject({ method: 'POST', url: '/api/v1/setup', payload: { username: 'owner', displayName: 'Owner', password: 'owner password 1' } }));
   writeToken = (await asUser('POST', '/api/v1/tokens', { name: 'agent', scope: 'write', expiresInDays: null })).json().secret;
   readToken = (await asUser('POST', '/api/v1/tokens', { name: 'reader', scope: 'read', expiresInDays: null })).json().secret;
+  await asUser('PATCH', '/api/v1/admin/mcp', { enabled: true });
   bench = (await asUser('GET', '/api/v1/exercises?q=barbell%20bench%20press')).json().exercises[0].name;
   row = (await asUser('GET', '/api/v1/exercises?q=bent%20over%20barbell%20row')).json().exercises[0].name;
 });
@@ -92,7 +93,15 @@ test('read tokens only see and run the reading tools', async () => {
   assert.match(msg, /can only read/);
 });
 
-test('an admin can turn MCP off', async () => {
+test('MCP is off until an admin turns it on, and can be turned off again', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'setryx-test-'));
+  const fresh = await buildApp(loadConfig({ DATA_DIR: dir, WEB_DIST: join(dir, 'none') }), openDb(':memory:'));
+  const owner = cookieOf(await fresh.inject({ method: 'POST', url: '/api/v1/setup', payload: { username: 'owner', displayName: 'Owner', password: 'owner password 1' } }));
+  const t = (await fresh.inject({ method: 'POST', url: '/api/v1/tokens', payload: { name: 'a', scope: 'read', expiresInDays: null }, headers: { cookie: owner } })).json();
+  assert.equal(t.token.scope, 'read');
+  assert.equal((await fresh.inject({ method: 'GET', url: '/api/v1/tokens', headers: { cookie: owner } })).json().mcpEnabled, false);
+  assert.equal((await fresh.inject({ method: 'POST', url: '/mcp', payload: { jsonrpc: '2.0', id: 1, method: 'ping' }, headers: { authorization: `Bearer ${t.secret}` } })).statusCode, 404);
+
   assert.equal((await asUser('PATCH', '/api/v1/admin/mcp', { enabled: false })).json().enabled, false);
   assert.equal((await rpc(writeToken, 'tools/list')).statusCode, 404);
   assert.equal((await asUser('GET', '/api/v1/tokens')).json().mcpEnabled, false);

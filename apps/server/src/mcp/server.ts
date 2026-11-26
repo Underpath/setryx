@@ -18,7 +18,7 @@ const VERSION = (JSON.parse(readFileSync(new URL('../../package.json', import.me
 
 export function mcpEnabled(db: DB): boolean {
   const row = db.prepare('SELECT value FROM app_settings WHERE key = ?').get(KEY) as { value: string } | undefined;
-  return row?.value !== 'false'; // on unless an admin turned it off
+  return row?.value === 'true'; // off until an admin turns it on
 }
 
 export function setMcpEnabled(db: DB, enabled: boolean): void {
