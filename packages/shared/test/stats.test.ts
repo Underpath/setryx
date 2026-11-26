@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { bestsOf, calendarWeeks, e1rm, newRecords, recordTimeline, sessionMetrics, weeklyStats } from '../src/index.ts';
+import { bestsOf, calendarWeeks, dailyStreak, e1rm, newRecords, recordTimeline, sessionMetrics, weeklyStats } from '../src/index.ts';
 
 const now = new Date('2026-11-26T12:00:00'); // Thursday
 const at = (iso: string, mins = 45) => ({ startedAt: new Date(iso).toISOString(), durationMs: mins * 60_000 });
@@ -74,4 +74,11 @@ test('record timeline and per-session metrics', () => {
   assert.equal(m.totalReps, 18);
   assert.equal(m.volumeKg, 360);
   assert.equal(m.e1rm, 26.7);
+});
+
+test('daily streak: runs to yesterday until today has a session', () => {
+  const s = [at('2026-11-20T10:00:00'), at('2026-11-21T10:00:00'), at('2026-11-23T09:00:00'), at('2026-11-24T09:00:00'), at('2026-11-25T21:00:00')];
+  assert.deepEqual(dailyStreak(s, now), { current: 3, best: 3, today: false });
+  assert.deepEqual(dailyStreak([...s, at('2026-11-26T07:00:00')], now), { current: 4, best: 4, today: true });
+  assert.equal(dailyStreak([at('2026-11-20T10:00:00')], now).current, 0, 'a gap ends it');
 });

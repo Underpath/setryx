@@ -565,3 +565,20 @@ textarea.input { resize: vertical; min-height: 88px; line-height: 1.45; }
 /* Records: a ringed marker, same as the record dots on the chart */
 .record-mark { width: 14px; height: 14px; border-radius: 999px; border: 2.5px solid var(--chart-1); flex: none; }
 .records-tile b { color: var(--blue-text); }
+
+/* Stats sections: each its own panel, so where one ends and the next starts is plain */
+.panel { margin-top: 14px; padding: 16px 16px 14px; border-radius: 20px; background: var(--raise); border: 1px solid var(--rule); }
+.panel-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+.panel-head .h3 { font-size: 1.45rem; }
+.panel-meta { font-size: .8rem; color: var(--muted); }
+.panel .rows > li:first-child > .row, .panel .rows > .row:first-child { border-top: 0; }
+.panel .rows > li:last-child > .row, .panel .rows > .row:last-child { border-bottom: 0; }
+.panel .row { padding: 12px 0; }
+.panel .stat-tiles { margin-top: 0; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+@media (max-width: 480px) { .panel { padding: 14px 12px 12px; } .panel .stat-tile { padding: 10px; } .panel .stat-tile .value small { display: block; margin: 4px 0 0; } .panel .stat-tile .sub { font-size: .75rem; } }
+.panel .stat-tile { background: var(--bg); border-color: transparent; }
+.panel .chart .dot { stroke: var(--raise); }
+.panel .chart .dot.record { fill: var(--raise); }
+.panel .data-table td, .panel .data-table th { border-color: var(--rule); }
+.panel-more { margin-top: 10px; width: 100%; }
+.panel .link-btn.small { margin-top: 6px; }

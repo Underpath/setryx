@@ -11,7 +11,7 @@ import { WorkoutsPage } from './pages/WorkoutsPage.tsx';
 import { LibraryPage } from './pages/LibraryPage.tsx';
 import { WorkoutEditorPage } from './pages/WorkoutEditorPage.tsx';
 import { ImportPage } from './pages/ImportPage.tsx';
-import { StatsPage } from './pages/StatsPage.tsx';
+import { AllExercisesPage, StatsPage } from './pages/StatsPage.tsx';
 import { PlayerRoute, ResumeRoute } from './player/PlayerPage.tsx';
 import { ReviewRoute } from './player/ReviewPage.tsx';
 import { RoutineEditorPage } from './pages/RoutineEditorPage.tsx';
@@ -70,6 +70,7 @@ const Library = withUser(LibraryPage);
 const Stats = withUser(StatsPage);
 const Routines = withUser(RoutinesPage);
 const ExerciseStats = withUser(ExerciseStatsPage);
+const AllExercises = withUser(AllExercisesPage);
 
 export const router = createBrowserRouter([
   {
@@ -105,6 +106,7 @@ export const router = createBrowserRouter([
           { path: '/routines', element: <Routines /> },
           { path: '/library', element: <Library /> },
           { path: '/stats', element: <Stats /> },
+          { path: '/stats/exercises', element: <AllExercises /> },
           { path: '/stats/exercises/:id', element: <ExerciseStats /> },
         ],
       },

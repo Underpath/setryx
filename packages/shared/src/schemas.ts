@@ -27,6 +27,8 @@ export const userSettingsSchema = z.object({
   theme: z.enum(['system', 'light', 'dark']).default('system'),
   /** First day of the week: 0 = Monday … 6 = Sunday. */
   weekStart: z.number().int().min(0).max(6).default(0),
+  /** Count the streak on Stats in days or weeks. */
+  streakUnit: z.enum(['weeks', 'days']).default('weeks'),
 });
 export type UserSettings = z.infer<typeof userSettingsSchema>;
 export const defaultUserSettings: UserSettings = userSettingsSchema.parse({});

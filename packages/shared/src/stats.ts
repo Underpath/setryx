@@ -77,6 +77,29 @@ const ymd = (k: string): [number, number, number] => {
   return [y, m - 1, d];
 };
 
+export type DailyStreak = { current: number; best: number; today: boolean };
+
+/** Days in a row with a session. Today counts once it has one; until then the streak runs to yesterday. */
+export function dailyStreak(sessions: SessionPoint[], now: Date): DailyStreak {
+  const days = new Set(sessions.map((s) => dayKey(new Date(s.startedAt))));
+  const todayKey = dayKey(now);
+  let current = 0;
+  let cursor = days.has(todayKey) ? new Date(now) : addDays(now, -1);
+  while (days.has(dayKey(cursor))) {
+    current++;
+    cursor = addDays(cursor, -1);
+  }
+  let best = 0;
+  let run = 0;
+  let prev: string | null = null;
+  for (const k of [...days].sort()) {
+    run = prev && dayKey(addDays(new Date(...ymd(prev)), 1)) === k ? run + 1 : 1;
+    best = Math.max(best, run);
+    prev = k;
+  }
+  return { current, best: Math.max(best, current), today: days.has(todayKey) };
+}
+
 export type CalendarDay = { key: string; date: Date; sessions: number; durationMs: number; future: boolean };
 
 /** A grid of weeks (oldest first), each Monday-or-whatever first, for a heatmap. */

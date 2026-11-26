@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router';
-import { type Bests, type PublicUser, type SessionSummary, WEEKDAYS, calendarWeeks, weekOrder, weeklyStats } from '@setryx/shared';
+import { type Bests, type ExerciseStat, type PublicUser, type SessionSummary, WEEKDAYS, calendarWeeks, dailyStreak, weekOrder, weeklyStats } from '@setryx/shared';
+import { useSetSetting } from './SettingsPage.tsx';
 import { type Column, ColumnChart, Heatmap } from '../components/charts.tsx';
 import { TopBar } from '../components/Shell.tsx';
 import { FormError, Sheet, useToast } from '../components/ui.tsx';
@@ -17,6 +18,27 @@ const hm = (ms: number) => {
   return m < 60 ? `${m} min` : `${Math.floor(m / 60)} h ${String(m % 60).padStart(2, '0')}`;
 };
 
+const plural = (n: number, word: string) => (n === 1 ? word : `${word}s`);
+
+/** Exercise rows: name, bests, how often, when last. */
+export function ExerciseRows({ list }: { list: ExerciseStat[] }) {
+  return (
+    <ul className="rows">
+      {list.map((e) => (
+        <li key={e.exerciseId}>
+          <Link className="row row-link" to={`/stats/exercises/${encodeURIComponent(e.exerciseId)}`}>
+            <span className="main">
+              <span className="name">{e.name}</span>
+              <span className="meta">{[bestsLine(e.bests), `${e.sessions} ${plural(e.sessions, 'session')}`].filter(Boolean).join(', ')}</span>
+            </span>
+            <span className="meta when">{dayFmt.format(new Date(e.lastDoneAt))}</span>
+          </Link>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 /** A short line of an exercise's bests, for lists. */
 export function bestsLine(b: Bests): string {
   const parts: string[] = [];
@@ -27,6 +49,28 @@ export function bestsLine(b: Bests): string {
   return parts.join(', ');
 }
 
+/** /stats/exercises: every exercise you've logged. */
+export function AllExercisesPage({ user }: { user: PublicUser }) {
+  const exercises = useExerciseStats();
+  const [q, setQ] = useState('');
+  const list = (exercises.data ?? []).filter((e) => e.name.toLowerCase().includes(q.trim().toLowerCase()));
+  return (
+    <>
+      <TopBar title="All exercises" user={user} back="/stats" />
+      <FormError error={exercises.error} />
+      <div className="field" style={{ marginBottom: 8 }}>
+        <input className="input" type="search" aria-label="Search exercises" placeholder="Search" value={q} onChange={(e) => setQ(e.target.value)} />
+      </div>
+      {exercises.isSuccess && (
+        <p className="small muted" style={{ marginBottom: 6 }}>
+          {list.length} of {exercises.data.length} exercises, most recent first
+        </p>
+      )}
+      <ExerciseRows list={list} />
+    </>
+  );
+}
+
 export function StatsPage({ user }: { user: PublicUser }) {
   const sessions = useSessions(50);
   const points = useStatSessions(400);
@@ -35,11 +79,15 @@ export function StatsPage({ user }: { user: PublicUser }) {
   const [measure, setMeasure] = useState<'sessions' | 'time'>('sessions');
   const [table, setTable] = useState(false);
   const weekStart = user.settings.weekStart;
+  const unit = user.settings.streakUnit;
+  const setSetting = useSetSetting(user);
   const list = sessions.data ?? [];
 
   const now = new Date();
   const weekly = useMemo(() => weeklyStats(points.data ?? [], now, weekStart, 12), [points.data, weekStart]); // eslint-disable-line react-hooks/exhaustive-deps
   const calendar = useMemo(() => calendarWeeks(points.data ?? [], now, weekStart, 26), [points.data, weekStart]); // eslint-disable-line react-hooks/exhaustive-deps
+  const daily = useMemo(() => dailyStreak(points.data ?? [], now), [points.data]); // eslint-disable-line react-hooks/exhaustive-deps
+  const streak = unit === 'days' ? { current: daily.current, best: daily.best, counted: daily.today } : { current: weekly.current, best: weekly.best, counted: weekly.thisWeek.sessions > 0 };
   const dayLabels = weekOrder(weekStart).map((d) => WEEKDAYS[d]!.slice(0, 1));
 
   const columns: Column[] = weekly.weeks.map((w, i) => {
@@ -70,25 +118,37 @@ export function StatsPage({ user }: { user: PublicUser }) {
         </section>
       ) : (
         <>
-          <section className="stat-tiles" aria-label="This week">
-            <div className="stat-tile streak">
-              <span className="label">Weekly streak</span>
-              <span className="value">{weekly.current}<small>{weekly.current === 1 ? 'week' : 'weeks'}</small></span>
-              <span className="sub">{weekly.thisWeek.sessions ? 'This week counts' : weekly.current ? 'Train this week to keep it' : 'Train this week to start one'}</span>
+          <section className="panel" aria-labelledby="streak-h">
+            <div className="panel-head">
+              <h2 className="h3" id="streak-h">Streak</h2>
+              <div className="seg seg-sm" role="radiogroup" aria-label="Count the streak in">
+                {(['days', 'weeks'] as const).map((u) => (
+                  <button key={u} type="button" role="radio" aria-checked={unit === u} className={unit === u ? 'on' : ''} onClick={() => setSetting('streakUnit', u)}>
+                    {u === 'days' ? 'Days' : 'Weeks'}
+                  </button>
+                ))}
+              </div>
             </div>
-            <div className="stat-tile">
-              <span className="label">Best streak</span>
-              <span className="value">{weekly.best}<small>{weekly.best === 1 ? 'week' : 'weeks'}</small></span>
-            </div>
-            <div className="stat-tile">
-              <span className="label">This week</span>
-              <span className="value">{weekly.thisWeek.sessions}<small>{weekly.thisWeek.sessions === 1 ? 'session' : 'sessions'}</small></span>
-              <span className="sub">{hm(weekly.thisWeek.durationMs)}</span>
+            <div className="stat-tiles">
+              <div className="stat-tile streak">
+                <span className="label">Current</span>
+                <span className="value">{streak.current}<small>{plural(streak.current, unit === 'days' ? 'day' : 'week')}</small></span>
+                <span className="sub">{streak.counted ? `${unit === 'days' ? 'Today' : 'This week'} counts` : streak.current ? `Train ${unit === 'days' ? 'today' : 'this week'} to keep it` : `Train ${unit === 'days' ? 'today' : 'this week'} to start one`}</span>
+              </div>
+              <div className="stat-tile">
+                <span className="label">Best</span>
+                <span className="value">{streak.best}<small>{plural(streak.best, unit === 'days' ? 'day' : 'week')}</small></span>
+              </div>
+              <div className="stat-tile">
+                <span className="label">This week</span>
+                <span className="value">{weekly.thisWeek.sessions}<small>{plural(weekly.thisWeek.sessions, 'session')}</small></span>
+                <span className="sub">{hm(weekly.thisWeek.durationMs)}</span>
+              </div>
             </div>
           </section>
 
-          <section className="section">
-            <h2 className="h3">Calendar</h2>
+          <section className="panel" aria-labelledby="cal-h">
+            <div className="panel-head"><h2 className="h3" id="cal-h">Calendar</h2><span className="panel-meta">Last six months</span></div>
             <Heatmap
               weeks={calendar}
               dayLabels={dayLabels}
@@ -98,8 +158,8 @@ export function StatsPage({ user }: { user: PublicUser }) {
             />
           </section>
 
-          <section className="section">
-            <div className="section-head">
+          <section className="panel">
+            <div className="panel-head">
               <h2 className="h3">{measure === 'sessions' ? 'Sessions per week' : 'Minutes per week'}</h2>
               <div className="seg seg-sm" role="radiogroup" aria-label="Measure">
                 <button type="button" role="radio" aria-checked={measure === 'sessions'} className={measure === 'sessions' ? 'on' : ''} onClick={() => setMeasure('sessions')}>Sessions</button>
@@ -122,26 +182,20 @@ export function StatsPage({ user }: { user: PublicUser }) {
           </section>
 
           {(exercises.data?.length ?? 0) > 0 && (
-            <section className="section">
-              <h2 className="h3">Exercises</h2>
-              <ul className="rows">
-                {exercises.data!.map((e) => (
-                  <li key={e.exerciseId}>
-                    <Link className="row row-link" to={`/stats/exercises/${encodeURIComponent(e.exerciseId)}`}>
-                      <span className="main">
-                        <span className="name">{e.name}</span>
-                        <span className="meta">{[bestsLine(e.bests), `${e.sessions} session${e.sessions === 1 ? '' : 's'}`].filter(Boolean).join(', ')}</span>
-                      </span>
-                      <span className="meta when">{dayFmt.format(new Date(e.lastDoneAt))}</span>
-                    </Link>
-                  </li>
-                ))}
-              </ul>
+            <section className="panel" aria-labelledby="ex-h">
+              <div className="panel-head">
+                <h2 className="h3" id="ex-h">Exercises</h2>
+                <span className="panel-meta">Most recent first</span>
+              </div>
+              <ExerciseRows list={exercises.data!.slice(0, 5)} />
+              {exercises.data!.length > 5 && (
+                <Link className="btn btn-quiet btn-sm panel-more" to="/stats/exercises">All {exercises.data!.length} exercises</Link>
+              )}
             </section>
           )}
 
-          <section className="section">
-            <h2 className="h3">Recent sessions</h2>
+          <section className="panel" aria-labelledby="recent-h">
+            <div className="panel-head"><h2 className="h3" id="recent-h">Recent sessions</h2></div>
             <ul className="rows">
               {list.map((s) => (
                 <li key={s.id}>

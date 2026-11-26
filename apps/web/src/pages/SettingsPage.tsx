@@ -19,7 +19,7 @@ const SECTIONS: { id: SectionId; label: string; hint: string; admin?: boolean }[
 const WIDE = '(min-width: 760px)';
 
 /** Saves one setting at a time, showing the change straight away. */
-function useSetSetting(user: PublicUser) {
+export function useSetSetting(user: PublicUser) {
   const setMe = useSetMe();
   const toast = useToast();
   const update = useMutation({
