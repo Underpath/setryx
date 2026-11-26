@@ -1,6 +1,7 @@
 import { type FormEvent, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { ApiToken, ApiTokenScope, CreateApiTokenRequest, PublicUser } from '@setryx/shared';
+import { Link } from 'react-router';
 import { api } from '../api.ts';
 import { Field, FormError, Icon, Sheet, Switch, fieldErrors, useToast } from '../components/ui.tsx';
 
@@ -20,11 +21,16 @@ const metaOf = (t: ApiToken) =>
     t.expiresAt ? `Expires ${dateFmt.format(new Date(t.expiresAt))}` : 'Doesn’t expire',
   ].join('. ') + '.';
 
+const limitsText = ({ perMinute, maxTokens }: { perMinute: number | null; maxTokens: number }) =>
+  `You can have up to ${maxTokens === 1 ? 'one token' : `${maxTokens} tokens`}. ${
+    perMinute === null ? 'This server doesn’t limit how many requests a token makes.' : `Each can make up to ${perMinute} requests a minute; past that, it’s asked to wait.`
+  }`;
+
 /** Settings → API and AI agents: personal tokens for scripts and AI agents. */
 export function ApiTokensSection({ user }: { user: PublicUser }) {
   const qc = useQueryClient();
   const toast = useToast();
-  const tokens = useQuery({ queryKey: ['tokens'], queryFn: () => api.get<{ tokens: ApiToken[]; mcpEnabled: boolean }>('/tokens') });
+  const tokens = useQuery({ queryKey: ['tokens'], queryFn: () => api.get<{ tokens: ApiToken[]; mcpEnabled: boolean; limits: { perMinute: number | null; maxTokens: number } }>('/tokens') });
   const [creating, setCreating] = useState(false);
   const [secret, setSecret] = useState<string | null>(null);
   const [revoking, setRevoking] = useState<ApiToken | null>(null);
@@ -61,6 +67,12 @@ export function ApiTokensSection({ user }: { user: PublicUser }) {
             </li>
           ))}
         </ul>
+        {tokens.data && (
+          <p className="muted small" style={{ marginTop: 10 }}>
+            {limitsText(tokens.data.limits)}
+            {user.role === 'admin' && <> <Link to="/settings/limits">Change the limits</Link></>}
+          </p>
+        )}
       </section>
 
       <McpSection user={user} enabled={tokens.data?.mcpEnabled ?? false} />

@@ -3,7 +3,8 @@ import type { FastifyPluginAsync, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import { resolveApiToken } from '../api-tokens.ts';
 import type { DB } from '../db.ts';
-import { isSameOrigin } from '../http.ts';
+import { HttpError, isSameOrigin } from '../http.ts';
+import { limitRequest } from '../app.ts';
 import { findUserById } from '../users.ts';
 import { type Ctx, ToolError, describeTool, toolsFor } from './tools.ts';
 
@@ -106,13 +107,23 @@ export const mcpRoutes: FastifyPluginAsync = async (app) => {
     const user = token ? findUserById(db, token.userId) : null;
     if (!token || !user || user.disabled) return deny(reply, 401, 'Send a setryx API token as “Authorization: Bearer <token>”. Create one in Settings → API and AI agents.');
 
+    // Each message counts against the token's limit, so a batch can't get round it.
+    const body = req.body as RpcRequest | RpcRequest[];
+    const cost = Math.max(1, Array.isArray(body) ? body.length : 1);
+    try {
+      limitRequest(req, reply, `token:${token.id}`, app.limits.get().tokenPerMinute, cost, 'This token');
+    } catch (err) {
+      if (err instanceof HttpError) return deny(reply, err.status, err.message);
+      throw err;
+    }
+
     const authorization = req.headers.authorization!;
     const ctx: Ctx = {
       db,
       userId: user.id,
       scope: token.scope,
       async api(method, path, body) {
-        const res = await app.inject({ method, url: `/api/v1${path}`, headers: { authorization }, ...(body === undefined ? {} : { payload: body as object }) });
+        const res = await app.inject({ method, url: `/api/v1${path}`, headers: { authorization, 'x-setryx-internal': app.internalKey }, ...(body === undefined ? {} : { payload: body as object }) });
         const data = res.body ? res.json() : null;
         if (res.statusCode >= 400) {
           const fields = data?.fields ? ` (${Object.entries(data.fields).map(([k, v]) => `${k}: ${v}`).join('; ')})` : '';
@@ -122,7 +133,6 @@ export const mcpRoutes: FastifyPluginAsync = async (app) => {
       },
     };
 
-    const body = req.body as RpcRequest | RpcRequest[];
     if (Array.isArray(body)) {
       const answers = (await Promise.all(body.map((msg) => handle(req, ctx, msg)))).filter(Boolean);
       return answers.length ? reply.send(answers) : reply.status(202).send();

@@ -108,6 +108,7 @@ const op = ({ write, ...o }: Op) => ({
     '401': { description: 'Missing, wrong, expired or revoked token.', ...json(ref('Error')) },
     '403': { description: write ? 'The token can only read.' : 'Tokens can’t do this.', ...json(ref('Error')) },
     '404': { description: 'Not found, or not yours.', ...json(ref('Error')) },
+    '429': { description: 'The token went over its requests-a-minute limit. Wait the seconds in `Retry-After`.', ...json(ref('Error')) },
   },
 });
 
@@ -292,7 +293,7 @@ export function openApiDocument(): Json {
       title: 'setryx API',
       version: '1',
       description:
-        'Your own training data: exercises, workouts, routines, sessions and stats. Authenticate with a personal API token from Settings → API and AI agents, sent as `Authorization: Bearer <token>`. A read-only token can use every GET; a read and write token can also create, change and delete. Tokens can’t sign in, change account or server settings, or manage other tokens.',
+        'Your own training data: exercises, workouts, routines, sessions and stats. Authenticate with a personal API token from Settings → API and AI agents, sent as `Authorization: Bearer <token>`. A read-only token can use every GET; a read and write token can also create, change and delete. Tokens can’t sign in, change account or server settings, or manage other tokens. Each token may make a set number of requests a minute (the server’s admin chooses it); responses carry `RateLimit-Limit` and `RateLimit-Remaining`, and a 429 carries `Retry-After`.',
     },
     servers: [{ url: '/api/v1' }],
     security: [{ token: [] }],

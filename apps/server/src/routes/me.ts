@@ -1,4 +1,4 @@
-import type { FastifyPluginAsync } from 'fastify';
+import type { FastifyPluginAsync, FastifyRequest } from 'fastify';
 import { changePasswordRequestSchema, updateMeRequestSchema } from '@setryx/shared';
 import { requireUser } from '../app.ts';
 import { HttpError, parse } from '../http.ts';
@@ -19,7 +19,7 @@ export const meRoutes: FastifyPluginAsync = async (app) => {
     return { user: toPublic(updated) };
   });
 
-  app.post('/me/password', { config: { rateLimit: { max: 10, timeWindow: '1 minute' } } }, async (req, reply) => {
+  app.post('/me/password', { config: { rateLimit: { max: (r: FastifyRequest) => r.server.limits.get().signInPerMinute, timeWindow: '1 minute' } } }, async (req, reply) => {
     const user = requireUser(req);
     const body = parse(changePasswordRequestSchema, req.body);
     if (!(await verifyPassword(body.currentPassword, user.passwordHash))) {

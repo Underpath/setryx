@@ -10,11 +10,17 @@ export const tokenRoutes: FastifyPluginAsync = async (app) => {
   const { db } = app;
   app.addHook('preHandler', async (req) => void requireUser(req));
 
-  app.get('/tokens', async (req) => ({ tokens: listApiTokens(db, req.user!.id), mcpEnabled: mcpEnabled(db) }));
+  app.get('/tokens', async (req) => {
+    const { tokenPerMinute, maxTokensPerUser } = app.limits.get();
+    return { tokens: listApiTokens(db, req.user!.id), mcpEnabled: mcpEnabled(db), limits: { perMinute: tokenPerMinute, maxTokens: maxTokensPerUser } };
+  });
 
   app.post('/tokens', async (req, reply) => {
     const body = parse(createApiTokenRequestSchema, req.body);
-    if (listApiTokens(db, req.user!.id).length >= 20) throw new HttpError(400, 'too_many_tokens', 'You have 20 tokens. Revoke one you no longer use first.');
+    const max = app.limits.get().maxTokensPerUser;
+    if (listApiTokens(db, req.user!.id).length >= max) {
+      throw new HttpError(400, 'too_many_tokens', `You have ${max === 1 ? 'a token' : `${max} tokens`}, the most this server allows. Revoke one you no longer use first.`);
+    }
     return reply.status(201).send(createApiToken(db, req.user!.id, body));
   });
 

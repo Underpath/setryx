@@ -1,3 +1,4 @@
+import { randomBytes } from 'node:crypto';
 import Fastify, { type FastifyInstance, type FastifyReply, type FastifyRequest } from 'fastify';
 import cookie from '@fastify/cookie';
 import rateLimit from '@fastify/rate-limit';
@@ -6,6 +7,7 @@ import type { Config } from './config.ts';
 import type { DB } from './db.ts';
 import { type ResolvedToken, resolveApiToken, tokenMayUse } from './api-tokens.ts';
 import { Backups } from './backup.ts';
+import { Limits, RateLimiter } from './limits.ts';
 import { HttpError, isSameOrigin, sendError } from './http.ts';
 import { SESSION_COOKIE, resolveSession } from './sessions.ts';
 import { type UserRecord, findUserById } from './users.ts';
@@ -26,6 +28,10 @@ declare module 'fastify' {
     db: DB;
     config: Config;
     backups: Backups;
+    limits: Limits;
+    rateLimiter: RateLimiter;
+    /** Marks the server's own in-process requests (MCP tools calling the API), which aren't counted twice. */
+    internalKey: string;
   }
   interface FastifyRequest {
     user: UserRecord | null;
@@ -37,7 +43,7 @@ declare module 'fastify' {
 
 export async function buildApp(config: Config, db: DB, opts: { logger?: boolean } = {}): Promise<FastifyInstance> {
   const app = Fastify({
-    logger: opts.logger ? { level: 'info', redact: ['req.headers.cookie', 'req.headers.authorization'] } : false,
+    logger: opts.logger ? { level: 'info', redact: ['req.headers.cookie', 'req.headers.authorization', 'req.headers["x-setryx-internal"]'] } : false,
     trustProxy: config.trustProxy,
     bodyLimit: 1_048_576,
   });
@@ -45,6 +51,9 @@ export async function buildApp(config: Config, db: DB, opts: { logger?: boolean 
   app.decorate('db', db);
   app.decorate('config', config);
   app.decorate('backups', new Backups(db, config.dataDir));
+  app.decorate('limits', new Limits(db));
+  app.decorate('rateLimiter', new RateLimiter());
+  app.decorate('internalKey', randomBytes(24).toString('base64url'));
   app.decorateRequest('user', null);
   app.decorateRequest('sessionToken', null);
   app.decorateRequest('apiToken', null);
@@ -82,6 +91,9 @@ export async function buildApp(config: Config, db: DB, opts: { logger?: boolean 
       }
       req.user = user;
       req.apiToken = token;
+      if (req.headers['x-setryx-internal'] !== app.internalKey) {
+        limitRequest(req, reply, `token:${token.id}`, app.limits.get().tokenPerMinute, 1, 'This token');
+      }
       return;
     }
     if (!['GET', 'HEAD', 'OPTIONS'].includes(req.method) && !isSameOrigin(req)) {
@@ -98,6 +110,8 @@ export async function buildApp(config: Config, db: DB, opts: { logger?: boolean 
     req.user = user;
     req.sessionToken = unsigned.value;
     if (session.renewedUntil) setSessionCookie(req, reply, unsigned.value, session.renewedUntil);
+    // Exercise photos come in dozens per page and are cheap, so they aren't counted.
+    if (!req.url.startsWith('/api/v1/exercise-images/')) limitRequest(req, reply, `user:${user.id}`, app.limits.get().appPerMinute, 1, 'You');
   });
 
   // Polled by the Docker health check every 30 s; keep it out of the logs.
@@ -166,6 +180,23 @@ export function setSessionCookie(req: FastifyRequest, reply: FastifyReply, token
 
 export function clearSessionCookie(reply: FastifyReply): void {
   reply.clearCookie(SESSION_COOKIE, { path: '/' });
+}
+
+/**
+ * Counts a request against a per-minute limit (null: no limit). Over it,
+ * answers 429 with Retry-After; under it, says what's left.
+ */
+export function limitRequest(req: FastifyRequest, reply: FastifyReply, key: string, perMinute: number | null, cost: number, who: string): void {
+  if (perMinute === null) return;
+  const taken = req.server.rateLimiter.take(key, perMinute, cost);
+  reply.header('RateLimit-Limit', perMinute);
+  if (taken.ok) {
+    reply.header('RateLimit-Remaining', taken.remaining);
+    return;
+  }
+  reply.header('RateLimit-Remaining', 0).header('Retry-After', taken.retryAfterS);
+  const wait = taken.retryAfterS === 1 ? 'a second' : `${taken.retryAfterS} seconds`;
+  throw new HttpError(429, 'rate_limited', `${who} made more than ${perMinute} requests a minute, the limit on this server. Wait ${wait} and try again.`);
 }
 
 export function requireUser(req: FastifyRequest): UserRecord {

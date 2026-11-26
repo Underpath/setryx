@@ -112,6 +112,19 @@ curl -H "Authorization: Bearer setryx_…" http://<your-server>:38471/api/v1/wor
 - Tokens can expire after 30 days, 90 days or a year, or never. Revoke one at any time. Disabling an account stops its tokens; an admin password reset (or `reset-password`) revokes them.
 - Every endpoint a token can use is described in OpenAPI at `/api/v1/openapi.json`.
 
+### Limits
+
+An admin sets these under **Settings → Limits**. They take effect straight away.
+
+| Limit | Default | Applies to |
+|---|---|---|
+| Requests a minute for each token | 120 | the API and MCP together; can be turned off |
+| Requests a minute for each person in the app | 600 | everything the app asks for apart from exercise photos; can be turned off |
+| Sign-in attempts a minute from one address | 10 | signing in, signing up and changing a password |
+| Tokens each person can have | 20 | lowering it keeps existing tokens |
+
+A short burst up to the limit is fine. Going over it gets HTTP 429 with a `Retry-After` header, and API responses carry `RateLimit-Limit` and `RateLimit-Remaining`. Counts are kept in memory, so a restart resets them.
+
 ### AI agents (MCP)
 
 Agents like Claude can connect to setryx over MCP at `http://<your-server>:38471/mcp`, signing in with an API token. For example, in Claude Code:

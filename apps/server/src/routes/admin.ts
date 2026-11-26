@@ -6,6 +6,7 @@ import {
   appSettingsSchema,
   backupSettingsSchema,
   createInviteRequestSchema,
+  limitSettingsSchema,
 } from '@setryx/shared';
 import { z } from 'zod';
 import { requireAdmin } from '../app.ts';
@@ -156,6 +157,10 @@ export const adminRoutes: FastifyPluginAsync = async (app) => {
     setMcpEnabled(db, enabled);
     return { enabled: mcpEnabled(db) };
   });
+
+  // Request and token limits (see limits.ts).
+  app.get('/limits', async () => app.limits.get());
+  app.put('/limits', async (req) => app.limits.set(parse(limitSettingsSchema, req.body)));
 
   app.get('/settings', async () => ({ openSignup: getOpenSignup(db) }));
 

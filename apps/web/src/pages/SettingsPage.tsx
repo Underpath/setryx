@@ -8,8 +8,9 @@ import { Field, FormError, Icon, Sheet, Switch, fieldErrors, useToast } from '..
 import { useMediaQuery } from '../util.ts';
 import { InvitesSection, UsersSection } from './AdminPage.tsx';
 import { ApiTokensSection } from './ApiTokensSection.tsx';
+import { LimitsSection } from './LimitsSection.tsx';
 
-type SectionId = 'account' | 'workouts' | 'general' | 'data' | 'api' | 'people' | 'photos' | 'backups';
+type SectionId = 'account' | 'workouts' | 'general' | 'data' | 'api' | 'people' | 'photos' | 'limits' | 'backups';
 const SECTIONS: { id: SectionId; label: string; hint: string; admin?: boolean }[] = [
   { id: 'account', label: 'Account', hint: 'Name and password' },
   { id: 'workouts', label: 'During workouts', hint: 'Tapping, screen, sounds, warning' },
@@ -18,6 +19,7 @@ const SECTIONS: { id: SectionId; label: string; hint: string; admin?: boolean }[
   { id: 'api', label: 'API and AI agents', hint: 'Tokens, MCP' },
   { id: 'people', label: 'People and invites', hint: 'Accounts on this server', admin: true },
   { id: 'photos', label: 'Exercise photos', hint: 'Allow, download or remove', admin: true },
+  { id: 'limits', label: 'Limits', hint: 'Requests, sign-in attempts, tokens', admin: true },
   { id: 'backups', label: 'Backups', hint: 'Database copies for your volume backups', admin: true },
 ];
 const WIDE = '(min-width: 760px)';
@@ -115,6 +117,8 @@ export function SettingsSection() {
       ) : null;
     case 'photos':
       return user.role === 'admin' ? <PhotosSection /> : null;
+    case 'limits':
+      return user.role === 'admin' ? <LimitsSection /> : null;
     case 'backups':
       return user.role === 'admin' ? <BackupsSection /> : null;
     default:

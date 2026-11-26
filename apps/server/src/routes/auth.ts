@@ -1,4 +1,4 @@
-import type { FastifyPluginAsync } from 'fastify';
+import type { FastifyPluginAsync, FastifyRequest } from 'fastify';
 import { loginRequestSchema, registerRequestSchema, setupRequestSchema } from '@setryx/shared';
 import { clearSessionCookie, requireUser, setSessionCookie } from '../app.ts';
 import { tx } from '../db.ts';
@@ -8,7 +8,8 @@ import { dummyVerify, hashPassword, verifyPassword } from '../passwords.ts';
 import { createSession, deleteSession } from '../sessions.ts';
 import { countUsers, findUserByUsername, getOpenSignup, insertUser, toPublic } from '../users.ts';
 
-const authLimit = { config: { rateLimit: { max: 10, timeWindow: '1 minute' } } };
+// Per IP address; an admin sets how many in Settings → Limits.
+const authLimit = { config: { rateLimit: { max: (req: FastifyRequest) => req.server.limits.get().signInPerMinute, timeWindow: '1 minute' } } };
 
 const usernameTaken = () =>
   new HttpError(409, 'username_taken', 'That username is taken.', { username: 'That username is taken.' });
