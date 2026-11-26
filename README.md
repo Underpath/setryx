@@ -190,3 +190,7 @@ sh e2e/run.sh
 ```
 
 It starts from an empty database every time and removes the test copy of setryx when it's done. The Playwright image is a large one-off download (Docker lists it at about 3.5 GB); remove it with `docker rmi mcr.microsoft.com/playwright:v1.55.0-noble` when you no longer need it.
+
+## License
+
+setryx is under the [MIT License](LICENSE). The exercise library comes from [free-exercise-db](https://github.com/yuhonas/free-exercise-db), which is public domain. The fonts are under the SIL Open Font License, and the other packages setryx ships are listed with their licenses in [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md). After changing dependencies, regenerate that file with `node scripts/third-party-licenses.mjs`.

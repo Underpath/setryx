@@ -39,6 +39,7 @@ COPY --from=build /app/apps/server/package.json apps/server/
 COPY --from=build /app/apps/server/src apps/server/src
 COPY --from=build /app/apps/server/seed apps/server/seed
 COPY --from=build /app/apps/web/dist apps/web/dist
+COPY LICENSE THIRD_PARTY_LICENSES.md ./
 # Admin helpers: docker exec -it setryx reset-password <username>
 RUN printf '#!/bin/sh\nexec node /app/apps/server/src/cli.ts reset-password "$@"\n' > /usr/local/bin/reset-password \
  && printf '#!/bin/sh\nexec node /app/apps/server/src/cli.ts list-users\n' > /usr/local/bin/list-users \
