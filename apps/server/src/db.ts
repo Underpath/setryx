@@ -2,22 +2,31 @@ import { DatabaseSync } from 'node:sqlite';
 import { join } from 'node:path';
 import { migrations } from './migrations.ts';
 import { seedExercises } from './exercises.ts';
+import { backupBeforeUpdate } from './backup.ts';
 
 export type DB = DatabaseSync;
 
 export function openDb(dataDir: string | ':memory:'): DB {
   const db = new DatabaseSync(dataDir === ':memory:' ? ':memory:' : join(dataDir, 'setryx.db'));
-  db.exec('PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 5000; PRAGMA synchronous = NORMAL;');
-  migrate(db);
+  // Rollback-journal mode, not WAL: every committed change is in setryx.db itself,
+  // so the file on its own is a complete copy for volume backups. (WAL keeps recent
+  // changes in a side file until it's merged.) One process, few writes: no cost here.
+  db.exec('PRAGMA journal_mode = DELETE; PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 5000; PRAGMA synchronous = FULL;');
+  migrate(db, dataDir);
   seedExercises(db);
   return db;
 }
 
-function migrate(db: DB): void {
+function migrate(db: DB, dataDir: string | ':memory:'): void {
   db.exec('CREATE TABLE IF NOT EXISTS schema_migrations (version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL)');
   const applied = new Set(
     (db.prepare('SELECT version FROM schema_migrations').all() as { version: number }[]).map((r) => r.version),
   );
+  const pending = migrations.filter((m) => !applied.has(m.version));
+  // An update is about to change an existing database: keep a copy of it first.
+  if (pending.length && applied.size && dataDir !== ':memory:') {
+    backupBeforeUpdate(db, dataDir, Math.max(...pending.map((m) => m.version)));
+  }
   for (const m of migrations) {
     if (applied.has(m.version)) continue;
     tx(db, () => {

@@ -1,14 +1,14 @@
 import { type FormEvent, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, NavLink, Navigate, Outlet, useNavigate, useParams } from 'react-router';
-import { type PublicUser, type UpdateMeRequest, type UserSettings, WEEKDAYS } from '@setryx/shared';
+import { type BackupFile, type BackupSettings, type PublicUser, type UpdateMeRequest, type UserSettings, WEEKDAYS } from '@setryx/shared';
 import { api } from '../api.ts';
 import { useLogout, useMe, useSetMe } from '../session.ts';
 import { Field, FormError, Icon, Sheet, Switch, fieldErrors, useToast } from '../components/ui.tsx';
 import { useMediaQuery } from '../util.ts';
 import { InvitesSection, UsersSection } from './AdminPage.tsx';
 
-type SectionId = 'account' | 'workouts' | 'general' | 'data' | 'people' | 'photos';
+type SectionId = 'account' | 'workouts' | 'general' | 'data' | 'people' | 'photos' | 'backups';
 const SECTIONS: { id: SectionId; label: string; hint: string; admin?: boolean }[] = [
   { id: 'account', label: 'Account', hint: 'Name and password' },
   { id: 'workouts', label: 'During workouts', hint: 'Tapping, screen, sounds, warning' },
@@ -16,6 +16,7 @@ const SECTIONS: { id: SectionId; label: string; hint: string; admin?: boolean }[
   { id: 'data', label: 'Import and export', hint: 'Bring workouts in, take everything out' },
   { id: 'people', label: 'People and invites', hint: 'Accounts on this server', admin: true },
   { id: 'photos', label: 'Exercise photos', hint: 'Allow, download or remove', admin: true },
+  { id: 'backups', label: 'Backups', hint: 'Database copies for your volume backups', admin: true },
 ];
 const WIDE = '(min-width: 760px)';
 
@@ -110,9 +111,116 @@ export function SettingsSection() {
       ) : null;
     case 'photos':
       return user.role === 'admin' ? <PhotosSection /> : null;
+    case 'backups':
+      return user.role === 'admin' ? <BackupsSection /> : null;
     default:
       return null;
   }
+}
+
+type BackupState = { settings: BackupSettings; defaultDir: string; files: BackupFile[] };
+const EVERY: { v: BackupSettings['latestEveryMinutes']; label: string }[] = [
+  { v: 0, label: 'Off' },
+  { v: 5, label: 'Every 5 minutes' },
+  { v: 15, label: 'Every 15 minutes' },
+  { v: 60, label: 'Every hour' },
+  { v: 360, label: 'Every 6 hours' },
+  { v: 1440, label: 'Once a day' },
+];
+const fileLabel = (f: BackupFile) =>
+  f.kind === 'latest' ? 'Up-to-date copy' : f.kind === 'manual' ? 'Made by hand' : `Before the update to database version ${f.name.match(/-v(\d+)-/)?.[1] ?? '?'}`;
+const whenFmt = new Intl.DateTimeFormat(undefined, { day: 'numeric', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit' });
+
+/** Admin: where database copies go, how many to keep, and the copies themselves. */
+function BackupsSection() {
+  const qc = useQueryClient();
+  const toast = useToast();
+  const state = useQuery({ queryKey: ['admin', 'backups'], queryFn: () => api.get<BackupState>('/admin/backups') });
+  const [draft, setDraft] = useState<BackupSettings | null>(null);
+  const settings = draft ?? state.data?.settings ?? null;
+  const save = useMutation({
+    mutationFn: (s: BackupSettings) => api.put<BackupState>('/admin/backups', s),
+    onSuccess: (d) => (qc.setQueryData(['admin', 'backups'], d), setDraft(null), toast('Backup settings saved')),
+  });
+  const now = useMutation({
+    mutationFn: () => api.post<BackupState>('/admin/backups/now'),
+    onSuccess: (d) => (qc.setQueryData(['admin', 'backups'], d), toast('Copy made')),
+    onError: (e) => toast(e.message),
+  });
+  if (!state.data || !settings) return <FormError error={state.error} />;
+  const dirty = !!draft && JSON.stringify(draft) !== JSON.stringify(state.data.settings);
+  const edit = (patch: Partial<BackupSettings>) => setDraft({ ...settings, ...patch });
+  const { fields, general } = fieldErrors(save.error);
+  return (
+    <>
+      <p className="muted small" style={{ maxWidth: '62ch', marginBottom: 6 }}>
+        setryx keeps complete copies of its database here for your own volume backups to pick up. Every copy is written in one go, so it’s always safe to copy. Exercise
+        photos aren’t included; they can be downloaded again.
+      </p>
+      <ul className="rows">
+        <li className="row backup-field">
+          <div className="main">
+            <label className="name" htmlFor="b-dir">Folder</label>
+            <div className="meta">A path inside the container. To keep copies somewhere else, mount another volume and enter its path. Default: {state.data.defaultDir}</div>
+            <input id="b-dir" className="input" value={settings.dir} onChange={(e) => edit({ dir: e.target.value })} aria-invalid={fields.dir ? true : undefined} spellCheck={false} />
+            {fields.dir && <div className="field-error">{fields.dir}</div>}
+          </div>
+        </li>
+        <li className="row">
+          <div className="main">
+            <div className="name">Copies before updates</div>
+            <div className="meta">Taken just before a new version changes the database. Also how many copies made by hand are kept.</div>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <button className="icon-btn btn-quiet" type="button" aria-label="Keep fewer" disabled={settings.keep <= 1} onClick={() => edit({ keep: settings.keep - 1 })}>−</button>
+            <b className="h3" style={{ minWidth: '2ch', textAlign: 'center' }} aria-live="polite">{settings.keep}</b>
+            <button className="icon-btn btn-quiet" type="button" aria-label="Keep more" disabled={settings.keep >= 50} onClick={() => edit({ keep: settings.keep + 1 })}>+</button>
+          </div>
+        </li>
+        <li className="row">
+          <div className="main">
+            <label className="name" htmlFor="b-every">Up-to-date copy</label>
+            <div className="meta">setryx-latest.db, refreshed this often when something changed, and when the server stops.</div>
+          </div>
+          <select id="b-every" className="input select-sm" value={settings.latestEveryMinutes} onChange={(e) => edit({ latestEveryMinutes: Number(e.target.value) as BackupSettings['latestEveryMinutes'] })}>
+            {EVERY.map((o) => <option key={o.v} value={o.v}>{o.label}</option>)}
+          </select>
+        </li>
+      </ul>
+      <FormError error={general} />
+      {dirty && (
+        <div className="sheet-actions" style={{ marginTop: 10 }}>
+          <button className="btn btn-primary btn-sm" type="button" disabled={save.isPending} onClick={() => save.mutate(draft!)}>Save backup settings</button>
+          <button className="btn btn-sm" type="button" onClick={() => (setDraft(null), save.reset())}>Cancel</button>
+        </div>
+      )}
+
+      <section className="section">
+        <div className="section-head">
+          <h3 className="h3">Copies</h3>
+          <button className="btn btn-strong btn-sm" type="button" disabled={now.isPending || dirty} title={dirty ? 'Save the settings first' : undefined} onClick={() => now.mutate()}>Make a copy now</button>
+        </div>
+        {state.data.files.length === 0 ? (
+          <p className="muted small">No copies in {state.data.settings.dir} yet.</p>
+        ) : (
+          <ul className="rows">
+            {state.data.files.map((f) => (
+              <li className="row" key={f.name}>
+                <div className="main">
+                  <div className="name">{fileLabel(f)}</div>
+                  <div className="meta">{f.name}, {mb(f.bytes)}</div>
+                </div>
+                <span className="meta when">{whenFmt.format(new Date(f.modifiedAt))}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+        <p className="small muted" style={{ marginTop: 10, maxWidth: '62ch' }}>
+          To restore one: stop the container, replace setryx.db in the data folder with the copy (renamed to setryx.db), then start it again.
+        </p>
+      </section>
+    </>
+  );
 }
 
 type ImagesStatus = {

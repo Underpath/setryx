@@ -4,10 +4,12 @@ import {
   adminResetPasswordRequestSchema,
   adminUpdateUserRequestSchema,
   appSettingsSchema,
+  backupSettingsSchema,
   createInviteRequestSchema,
 } from '@setryx/shared';
 import { z } from 'zod';
 import { requireAdmin } from '../app.ts';
+import { listBackups } from '../backup.ts';
 import { imagesAllowed, imagesStatus, removeAllImages, setImagesAllowed, startDownloadAll } from '../exercise-images.ts';
 import { tx } from '../db.ts';
 import { HttpError, parse } from '../http.ts';
@@ -94,6 +96,32 @@ export const adminRoutes: FastifyPluginAsync = async (app) => {
   app.delete<IdParams>('/invites/:id', async (req, reply) => {
     if (!deleteInvite(db, req.params.id)) throw new HttpError(404, 'not_found', 'No open invite with that id.');
     return reply.status(204).send();
+  });
+
+  // ── Backups ──
+  const backupState = () => {
+    const settings = app.backups.settings();
+    return { settings, defaultDir: `${app.config.dataDir.replace(/\/$/, '')}/backups`, files: listBackups(settings.dir) };
+  };
+  app.get('/backups', async () => backupState());
+
+  app.put('/backups', async (req) => {
+    const body = parse(backupSettingsSchema, req.body);
+    try {
+      app.backups.update(body);
+    } catch (err) {
+      throw new HttpError(400, 'invalid_input', (err as Error).message, { dir: (err as Error).message });
+    }
+    return backupState();
+  });
+
+  app.post('/backups/now', async () => {
+    try {
+      app.backups.copyNow();
+    } catch (err) {
+      throw new HttpError(400, 'backup_failed', (err as Error).message);
+    }
+    return backupState();
   });
 
   // ── Exercise photos ──

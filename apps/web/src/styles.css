@@ -592,3 +592,6 @@ textarea.input { resize: vertical; min-height: 88px; line-height: 1.45; }
 .photos-status .main { width: 100%; }
 .meter { height: 6px; border-radius: 3px; background: color-mix(in srgb, var(--blue) 18%, transparent); margin-top: 8px; overflow: hidden; }
 .meter i { display: block; height: 100%; background: var(--blue); transition: width .4s; }
+
+.backup-field .main { display: grid; gap: 6px; }
+.backup-field .input { margin-top: 2px; }

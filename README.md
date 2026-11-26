@@ -50,6 +50,28 @@ labels:
 ```
 Set `TRUST_PROXY: "true"` and `BASE_URL` when using a proxy.
 
+### Backups
+
+Everything lives in the `/data` volume, so backing up that volume backs up setryx. A few things make that safe:
+
+- The database file, `setryx.db`, always holds every saved change on its own; there's no side file to copy along.
+- setryx also keeps complete copies in `/data/backups` that are always written in one go, so a backup tool can never catch one half-written:
+  - `setryx-latest.db`, refreshed every 15 minutes when something changed, and when the container stops;
+  - `setryx-before-v<N>-<time>.db`, taken just before an update changes the database (the last 3 are kept).
+- An admin can change the folder, how many copies are kept and how often the up-to-date copy refreshes under **Settings → Backups**, and make a copy by hand. To keep copies outside the data volume, mount another volume and point the folder at it.
+
+Exercise photos (`/data/exercise-images`) aren't in the copies; they can always be downloaded again.
+
+To restore a copy:
+
+```bash
+docker compose stop setryx
+docker compose run --rm --no-deps --entrypoint sh setryx -c 'cp /data/backups/setryx-latest.db /data/setryx.db && rm -f /data/setryx.db-wal /data/setryx.db-shm /data/setryx.db-journal'
+docker compose start setryx
+```
+
+Replace `setryx-latest.db` with whichever copy you want. Run these from the folder with your `docker-compose.yml`.
+
 ### Locked out?
 
 ```bash

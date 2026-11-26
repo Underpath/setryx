@@ -119,6 +119,24 @@ export type Invite = z.infer<typeof inviteSchema>;
 export const appSettingsSchema = z.object({ openSignup: z.boolean() });
 export type AppSettings = z.infer<typeof appSettingsSchema>;
 
+/** Where database copies go and how many are kept. Paths are inside the container. */
+export const backupSettingsSchema = z.object({
+  dir: z
+    .string()
+    .trim()
+    .min(1, 'Enter a folder.')
+    .max(300)
+    .refine((p) => p.startsWith('/') && !p.split('/').includes('..'), 'Use a full path inside the container, like /data/backups.'),
+  /** Copies taken before an update changes the database. */
+  keep: z.number().int().min(1, 'Keep at least one.').max(50),
+  /** Refresh setryx-latest.db this often when something changed; 0 turns it off. */
+  latestEveryMinutes: z.union([z.literal(0), z.literal(5), z.literal(15), z.literal(60), z.literal(360), z.literal(1440)]),
+});
+export type BackupSettings = z.infer<typeof backupSettingsSchema>;
+export const defaultBackupSettings = (dataDir: string): BackupSettings => ({ dir: `${dataDir.replace(/\/$/, '')}/backups`, keep: 3, latestEveryMinutes: 15 });
+
+export type BackupFile = { name: string; kind: 'latest' | 'before-update' | 'manual'; bytes: number; modifiedAt: string };
+
 // ── Errors ────────────────────────────────────────────────
 
 export type ApiError = {

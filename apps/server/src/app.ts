@@ -4,6 +4,7 @@ import rateLimit from '@fastify/rate-limit';
 import fastifyStatic from '@fastify/static';
 import type { Config } from './config.ts';
 import type { DB } from './db.ts';
+import { Backups } from './backup.ts';
 import { HttpError, isSameOrigin, sendError } from './http.ts';
 import { SESSION_COOKIE, resolveSession } from './sessions.ts';
 import { type UserRecord, findUserById } from './users.ts';
@@ -20,6 +21,7 @@ declare module 'fastify' {
   interface FastifyInstance {
     db: DB;
     config: Config;
+    backups: Backups;
   }
   interface FastifyRequest {
     user: UserRecord | null;
@@ -36,6 +38,7 @@ export async function buildApp(config: Config, db: DB, opts: { logger?: boolean 
 
   app.decorate('db', db);
   app.decorate('config', config);
+  app.decorate('backups', new Backups(db, config.dataDir));
   app.decorateRequest('user', null);
   app.decorateRequest('sessionToken', null);
 
