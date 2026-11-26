@@ -1,28 +1,15 @@
 import { type FormEvent, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Navigate } from 'react-router';
 import type { AdminUpdateUserRequest, AppSettings, Invite, PublicUser } from '@setryx/shared';
 import { api } from '../api.ts';
 import { useSetMe } from '../session.ts';
-import { TopBar } from '../components/Shell.tsx';
 import { Field, FormError, Icon, Sheet, Switch, fieldErrors, useToast } from '../components/ui.tsx';
 
 const dateFmt = new Intl.DateTimeFormat(undefined, { day: 'numeric', month: 'short' });
 const formData = (e: FormEvent<HTMLFormElement>) => (e.preventDefault(), Object.fromEntries(new FormData(e.currentTarget)) as Record<string, string>);
 
-export function AdminPage({ user }: { user: PublicUser }) {
-  if (user.role !== 'admin') return <Navigate to="/settings" replace />;
-  return (
-    <>
-      <TopBar title="People and invites" back="/settings" />
-      <UsersSection me={user} />
-      <InvitesSection />
-    </>
-  );
-}
-
 // ── People ──
-function UsersSection({ me }: { me: PublicUser }) {
+export function UsersSection({ me }: { me: PublicUser }) {
   const users = useQuery({ queryKey: ['admin', 'users'], queryFn: () => api.get<{ users: PublicUser[] }>('/admin/users') });
   const [adding, setAdding] = useState(false);
   const [editing, setEditing] = useState<PublicUser | null>(null);
@@ -120,7 +107,7 @@ function ManageUserSheet({ me, user, onClose }: { me: PublicUser; user: PublicUs
 }
 
 // ── Invites and sign-up ──
-function InvitesSection() {
+export function InvitesSection() {
   const qc = useQueryClient();
   const toast = useToast();
   const invites = useQuery({ queryKey: ['admin', 'invites'], queryFn: () => api.get<{ invites: Invite[] }>('/admin/invites') });

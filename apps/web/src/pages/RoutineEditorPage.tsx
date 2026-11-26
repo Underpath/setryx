@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
-import { type Routine, type RoutineMode, WEEKDAYS, routineInputSchema } from '@setryx/shared';
+import { type Routine, type RoutineMode, WEEKDAYS, routineInputSchema, weekOrder } from '@setryx/shared';
 import { type BlockedNav, useAllowNextNavigation, useBackHandler } from '../components/backGuard.tsx';
 import { MODE_LABEL, RoutineStrip, useRoutineStatuses } from '../components/routines.tsx';
 import { move, useSortable } from '../components/sortable.ts';
@@ -75,8 +75,12 @@ export function RoutineEditorPage() {
       entries: d.mode === 'weekly' && mode !== 'weekly' ? [...d.entries].sort((a, b) => (a.weekday ?? 9) - (b.weekday ?? 9)) : d.entries,
     }));
 
-  const add = (workoutId: string) => {
-    setEntries((list) => [...list, { id: uid(), workoutId, weekday: picker?.weekday ?? null }]);
+  // Picked in the order tapped, added in that order.
+  const [picked, setPicked] = useState<string[]>([]);
+  const openPicker = (weekday: number | null) => (setPicked([]), setPicker({ weekday }));
+  const togglePick = (workoutId: string) => setPicked((p) => (p.includes(workoutId) ? p.filter((x) => x !== workoutId) : [...p, workoutId]));
+  const addPicked = () => {
+    setEntries((list) => [...list, ...picked.map((workoutId) => ({ id: uid(), workoutId, weekday: picker?.weekday ?? null }))]);
     setPicker(null);
   };
 
@@ -116,7 +120,7 @@ export function RoutineEditorPage() {
     return (
       <main className="editor">
         <FormError error={loaded.error} />
-        <Link className="btn btn-quiet" to="/workouts">Back to workouts</Link>
+        <Link className="btn btn-quiet" to="/routines">Back to routines</Link>
       </main>
     );
   }
@@ -137,7 +141,7 @@ export function RoutineEditorPage() {
         {draft.mode === 'weekly' && e.weekday == null && (
           <select className="input r-day" aria-label="Day" value="" onChange={(ev) => setEntries((list) => list.map((x) => (x.id === e.id ? { ...x, weekday: Number(ev.target.value) } : x)))}>
             <option value="" disabled>Pick a day</option>
-            {WEEKDAYS.map((d, k) => <option key={d} value={k}>{d}</option>)}
+            {weekOrder(me.data!.settings.weekStart).map((k) => <option key={k} value={k}>{WEEKDAYS[k]}</option>)}
           </select>
         )}
         <button className="icon-btn" type="button" aria-label={`Remove ${l?.name ?? 'workout'}`} onClick={() => setEntries((list) => list.filter((x) => x.id !== e.id))}>
@@ -150,7 +154,7 @@ export function RoutineEditorPage() {
   return (
     <main className="editor">
       <header className="topbar editor-bar">
-        <button className="icon-btn" type="button" aria-label="Back to workouts" onClick={() => navigate('/workouts')}><Icon name="back" /></button>
+        <button className="icon-btn" type="button" aria-label="Back to routines" onClick={() => navigate('/routines')}><Icon name="back" /></button>
         <h1 className="h2">
           {draft.name || (isNew ? 'New routine' : 'Routine')}
           {dirty && <span className="dirty-dot" title="Unsaved changes" aria-label="Unsaved changes" />}
@@ -184,7 +188,8 @@ export function RoutineEditorPage() {
         <section className="section">
           <h2 className="h3">Week</h2>
           <ul className="week-plan">
-            {WEEKDAYS.map((day, k) => {
+            {weekOrder(me.data!.settings.weekStart).map((k) => {
+              const day = WEEKDAYS[k]!;
               const list = draft.entries.filter((e) => e.weekday === k);
               return (
                 <li key={day} className={list.length ? '' : 'free'}>
@@ -200,7 +205,7 @@ export function RoutineEditorPage() {
                         </span>
                       );
                     })}
-                    <button className="wp-add" type="button" onClick={() => setPicker({ weekday: k })} aria-label={`Add a workout on ${day}`}>
+                    <button className="wp-add" type="button" onClick={() => openPicker(k)} aria-label={`Add a workout on ${day}`}>
                       {list.length ? '+' : '+ Add'}
                     </button>
                   </span>
@@ -219,7 +224,7 @@ export function RoutineEditorPage() {
         <section className="section">
           <div className="section-head">
             <h2 className="h3">Order</h2>
-            <button className="btn btn-quiet btn-sm" type="button" onClick={() => setPicker({ weekday: null })}>Add workout</button>
+            <button className="btn btn-quiet btn-sm" type="button" onClick={() => openPicker(null)}>Add workouts</button>
           </div>
           {draft.entries.length === 0 ? (
             <p className="muted">Add the workouts in the order you do them. The same workout can appear more than once.</p>
@@ -238,7 +243,7 @@ export function RoutineEditorPage() {
           <div style={{ marginTop: 14 }}>
             <Switch label="Active" hint="Paused routines don’t show on Today." checked={draft.active} onChange={(v) => setDraft({ ...draft, active: v })} />
           </div>
-          <div className="sheet-actions" style={{ marginTop: 12 }}>
+          <div className="split-actions">
             <button className="btn btn-sm" type="button" onClick={() => setConfirm('restart')} disabled={dirty}>Start from the beginning</button>
             <button className="btn btn-danger btn-sm" type="button" onClick={() => setConfirm('delete')}>Delete routine</button>
           </div>
@@ -246,18 +251,28 @@ export function RoutineEditorPage() {
       )}
 
       {picker && (
-        <Sheet title={picker.weekday != null ? `Add a workout on ${WEEKDAYS[picker.weekday]}` : 'Add a workout'} onClose={() => setPicker(null)}>
+        <Sheet title={picker.weekday != null ? `Add workouts on ${WEEKDAYS[picker.weekday]}` : 'Add workouts'} onClose={() => setPicker(null)}>
           {workouts.data?.length ? (
-            <ul className="rows">
-              {workouts.data.map((w) => (
-                <li key={w.id}>
-                  <button className="row row-button" type="button" onClick={() => add(w.id)}>
-                    <span className="emoji" aria-hidden>{w.icon || '•'}</span>
-                    <span className="main"><span className="name">{w.name}</span></span>
-                  </button>
-                </li>
-              ))}
-            </ul>
+            <>
+              <p className="small muted">Tap the workouts to add, in the order you want them.</p>
+              <ul className="rows pick-list">
+                {workouts.data.map((w) => {
+                  const n = picked.indexOf(w.id);
+                  return (
+                    <li key={w.id}>
+                      <button className={`row row-button${n >= 0 ? ' picked' : ''}`} type="button" aria-pressed={n >= 0} onClick={() => togglePick(w.id)}>
+                        <span className="pick-mark" aria-hidden>{n >= 0 ? n + 1 : ''}</span>
+                        <span className="emoji" aria-hidden>{w.icon || '•'}</span>
+                        <span className="main"><span className="name">{w.name}</span></span>
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+              <button className="btn btn-primary btn-block" type="button" disabled={!picked.length} onClick={addPicked}>
+                {picked.length ? `Add ${picked.length} workout${picked.length === 1 ? '' : 's'}` : 'Pick workouts to add'}
+              </button>
+            </>
           ) : (
             <p className="muted">You don’t have any workouts yet. Create one first.</p>
           )}
@@ -280,7 +295,7 @@ export function RoutineEditorPage() {
             className="btn btn-primary btn-block"
             type="button"
             disabled={del.isPending}
-            onClick={() => del.mutate(id!, { onSuccess: () => (toast('Routine deleted'), allowNext(), navigate('/workouts')) })}
+            onClick={() => del.mutate(id!, { onSuccess: () => (toast('Routine deleted'), allowNext(), navigate('/routines')) })}
           >
             Delete routine
           </button>

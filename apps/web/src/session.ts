@@ -1,4 +1,5 @@
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useNavigate } from 'react-router';
 import { useEffect } from 'react';
 import type { PublicUser } from '@setryx/shared';
 import { api, ApiRequestError } from './api.ts';
@@ -39,4 +40,21 @@ export function useThemeFromSettings(user: PublicUser | null | undefined) {
     if (theme === 'system') delete root.dataset.theme;
     else root.dataset.theme = theme;
   }, [theme]);
+}
+
+/** Signs out and drops everything this account left on the device. */
+export function useLogout() {
+  const qc = useQueryClient();
+  const setMe = useSetMe();
+  const navigate = useNavigate();
+  return useMutation({
+    mutationFn: () => api.post('/auth/logout'),
+    onSettled: () => {
+      qc.clear();
+      // Offline copies of workouts belong to this account; drop them on sign-out.
+      if ('caches' in window) void caches.delete('setryx-api').catch(() => {});
+      setMe(null);
+      navigate('/login', { replace: true });
+    },
+  });
 }

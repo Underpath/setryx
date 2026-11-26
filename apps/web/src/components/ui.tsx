@@ -8,6 +8,7 @@ const paths = {
   workouts: <path d="M4 6h16M4 12h16M4 18h10" />,
   library: <path d="M6 4v16M18 4v16M3 8h6M15 8h6M3 16h6M15 16h6M9 12h6" />,
   stats: <path d="M4 20V10M10 20V4M16 20v-7M22 20H2" />,
+  routines: <><path d="M4 12a8 8 0 0 1 14-5.3M20 12a8 8 0 0 1-14 5.3" /><path d="M18 3v4h-4M6 21v-4h4" /></>,
   back: <path d="M15 5l-7 7 7 7" />,
   close: <path d="M6 6l12 12M18 6L6 18" />,
   copy: <><rect x="9" y="9" width="11" height="11" rx="2" /><path d="M5 15V5a2 2 0 0 1 2-2h8" /></>,

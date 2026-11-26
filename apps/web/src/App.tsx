@@ -6,8 +6,7 @@ import { BackGuardProvider } from './components/backGuard.tsx';
 import { Shell } from './components/Shell.tsx';
 import { LoginPage, SetupPage, SignupPage } from './pages/AuthPages.tsx';
 import { TodayPage } from './pages/TodayPage.tsx';
-import { SettingsPage } from './pages/SettingsPage.tsx';
-import { AdminPage } from './pages/AdminPage.tsx';
+import { SettingsLayout, SettingsSection } from './pages/SettingsPage.tsx';
 import { WorkoutsPage } from './pages/WorkoutsPage.tsx';
 import { LibraryPage } from './pages/LibraryPage.tsx';
 import { WorkoutEditorPage } from './pages/WorkoutEditorPage.tsx';
@@ -16,6 +15,7 @@ import { StatsPage } from './pages/StatsPage.tsx';
 import { PlayerRoute, ResumeRoute } from './player/PlayerPage.tsx';
 import { ReviewRoute } from './player/ReviewPage.tsx';
 import { RoutineEditorPage } from './pages/RoutineEditorPage.tsx';
+import { RoutinesPage } from './pages/RoutinesPage.tsx';
 import { SyncRunner } from './sync/outbox.ts';
 
 const PUBLIC_PATHS = ['/login', '/signup', '/invite/'];
@@ -64,11 +64,10 @@ function withUser(Page: ComponentType<{ user: PublicUser }>) {
 }
 
 const Today = withUser(TodayPage);
-const Settings = withUser(SettingsPage);
-const Admin = withUser(AdminPage);
 const Workouts = withUser(WorkoutsPage);
 const Library = withUser(LibraryPage);
 const Stats = withUser(StatsPage);
+const Routines = withUser(RoutinesPage);
 
 export const router = createBrowserRouter([
   {
@@ -83,6 +82,15 @@ export const router = createBrowserRouter([
       { path: '/workouts/import', element: <ImportPage /> },
       { path: '/workouts/:id', element: <WorkoutEditorPage /> },
       { path: '/routines/new', element: <RoutineEditorPage /> },
+      { path: '/settings/admin', element: <Navigate to="/settings/people" replace /> },
+      {
+        path: '/settings',
+        element: <SettingsLayout />,
+        children: [
+          { index: true, element: null },
+          { path: ':section', element: <SettingsSection /> },
+        ],
+      },
       { path: '/routines/:id', element: <RoutineEditorPage /> },
       { path: '/play', element: <ResumeRoute /> },
       { path: '/play/:workoutId', element: <PlayerRoute /> },
@@ -92,10 +100,9 @@ export const router = createBrowserRouter([
         children: [
           { index: true, element: <Today /> },
           { path: '/workouts', element: <Workouts /> },
+          { path: '/routines', element: <Routines /> },
           { path: '/library', element: <Library /> },
           { path: '/stats', element: <Stats /> },
-          { path: '/settings', element: <Settings /> },
-          { path: '/settings/admin', element: <Admin /> },
         ],
       },
       { path: '*', element: <Navigate to="/" replace /> },

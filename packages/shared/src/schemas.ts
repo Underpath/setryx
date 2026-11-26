@@ -25,6 +25,8 @@ export const userSettingsSchema = z.object({
   showTapHint: z.boolean().default(true),
   warnSeconds: z.number().int().min(0).max(60).default(10),
   theme: z.enum(['system', 'light', 'dark']).default('system'),
+  /** First day of the week: 0 = Monday … 6 = Sunday. */
+  weekStart: z.number().int().min(0).max(6).default(0),
 });
 export type UserSettings = z.infer<typeof userSettingsSchema>;
 export const defaultUserSettings: UserSettings = userSettingsSchema.parse({});

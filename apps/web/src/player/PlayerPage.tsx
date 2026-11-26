@@ -1,4 +1,4 @@
-import { type CSSProperties, type ReactNode, useEffect, useMemo, useState } from 'react';
+import { type CSSProperties, useEffect, useMemo, useState } from 'react';
 import { Link, Navigate, useNavigate, useParams, useSearchParams } from 'react-router';
 import {
   type FlatStep,
@@ -87,7 +87,7 @@ function NewSession({ user, workoutId }: { user: PublicUser; workoutId: string }
   const routinesSettled = !!picked || !routines.isPending;
   const initial = useMemo(() => {
     if (!w.data || !routinesSettled) return null;
-    const ctx = picked ?? routineContextFor(workoutId, routines.data ?? [], new Date(), pendingRuns(outbox));
+    const ctx = picked ?? routineContextFor(workoutId, routines.data ?? [], new Date(), pendingRuns(outbox), user.settings.weekStart);
     const exercises: Record<string, SnapshotExercise> = {};
     for (const [id, e] of Object.entries(w.data.exercises)) exercises[id] = { name: e.name, equipment: e.equipment, instructions: e.instructions };
     const { workout } = w.data;
@@ -208,9 +208,12 @@ function Player({ user, initial }: { user: PublicUser; initial: PlayerState }) {
           {tapToLog && settings.showTapHint && !state.paused && <span className="tap-hint">Tap anywhere to {step.targetType === 'timed' ? 'finish early' : 'log the set'}</span>}
         </>
       ) : changeover ? (
-        <Changeover preview={changeover} first={nextUp ? <NextSummary step={nextUp} name={ex(nextUp)?.name} /> : null} />
+        <>
+          <Changeover preview={changeover} />
+          <NextLine step={nextUp} name={ex(nextUp)?.name} />
+        </>
       ) : (
-        <NextLine step={nextUp} name={ex(nextUp)?.name} big={final} />
+        <NextLine step={nextUp} name={ex(nextUp)?.name} />
       )}
       {state.paused && p.countdown === null && <span className="paused-label">Paused</span>}
     </>
@@ -263,7 +266,8 @@ function Player({ user, initial }: { user: PublicUser; initial: PlayerState }) {
           </>
         ) : (
           <>
-            <b>{state.workoutName}</b>Step {state.index + 1} of {steps.length}
+            <b>{state.workoutName}</b>
+            {!wide && <>Step {state.index + 1} of {steps.length}</>}
           </>
         )}
       </div>
@@ -271,6 +275,12 @@ function Player({ user, initial }: { user: PublicUser; initial: PlayerState }) {
         <button className="icon-btn" type="button" aria-label="Form cues" onClick={() => setSheet('cues')}>
           <svg className="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" /><path d="M12 11v6M12 7.5v.5" /></svg>
         </button>
+      )}
+      {wide && (
+        <div className="p-mid" aria-live="off">
+          <b>{duration(elapsedMs(state, now))}</b>
+          <span>Step {state.index + 1} of {steps.length}</span>
+        </div>
       )}
       <WakeChip
         wanted={awake}
@@ -316,7 +326,6 @@ function Player({ user, initial }: { user: PublicUser; initial: PlayerState }) {
             {topBar}
             {progress}
             {tapArea}
-            <div className="t-elapsed small">{duration(elapsedMs(state, now))} elapsed, step {state.index + 1} of {steps.length}</div>
           </div>
           <aside className="t-panel">
             <RoundPanel state={state} />
@@ -427,9 +436,10 @@ function NextSummary({ step, name }: { step: FlatStep; name?: string }) {
   );
 }
 
-function NextLine({ step, name, big }: { step: FlatStep | null; name?: string; big: boolean }) {
+/** On a rest: the next exercise, big enough to read from the bench. */
+function NextLine({ step, name }: { step: FlatStep | null; name?: string }) {
   if (!step) return <span className="next-line">That’s the last one.</span>;
-  if (big && step.kind === 'exercise') {
+  if (step.kind === 'exercise') {
     return (
       <>
         <span className="load">{name}</span>
@@ -452,12 +462,6 @@ function CuesBlock({ step, exercise, compact }: { step: Extract<FlatStep, { kind
   const equipment = step.equipmentNote ?? exercise?.equipment.join(', ');
   return (
     <div className={`cues-block${compact ? ' compact' : ''}`}>
-      {(step.tempo || step.rir) && compact && (
-        <div className="cue-facts">
-          {step.tempo && <Cue label="Tempo" value={step.tempo} />}
-          {step.rir && <Cue label="Reps in reserve" value={step.rir} />}
-        </div>
-      )}
       {step.notes && <p>{step.notes}</p>}
       {!compact && equipment && <p className="small"><b>Equipment:</b> {equipment}</p>}
       {!compact && exercise && exercise.instructions.length > 0 && (
@@ -494,7 +498,7 @@ function progressSegments(steps: FlatStep[]): { start: number; count: number; ro
 }
 
 /** The changeover rest: the next superset's equipment, big enough to read from across the room. */
-function Changeover({ preview, first }: { preview: { label: string; items: string[] }; first: ReactNode }) {
+function Changeover({ preview }: { preview: { label: string; items: string[] } }) {
   return (
     <div className="changeover-card">
       {preview.items.length ? (
@@ -504,7 +508,6 @@ function Changeover({ preview, first }: { preview: { label: string; items: strin
       ) : (
         <p className="gear-none">No equipment needed</p>
       )}
-      {first && <p className="changeover-first">Starts with {first}</p>}
     </div>
   );
 }

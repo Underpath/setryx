@@ -4,7 +4,8 @@ import { z } from 'zod';
 //   repeat  cycle through in order; next is the one after the last done
 //   once    go through in order, then the routine is complete
 //   weekly  workouts on set weekdays; shows today's and any missed this week
-// Weekdays are 0 = Monday … 6 = Sunday.
+// Weekdays are 0 = Monday … 6 = Sunday. The week itself can start on any day
+// (a user setting); that only changes which days count as "this week".
 
 export const routineModeSchema = z.enum(['repeat', 'once', 'weekly']);
 export type RoutineMode = z.infer<typeof routineModeSchema>;
@@ -79,15 +80,21 @@ export type RoutineStatus =
 /** Monday = 0 … Sunday = 6, in local time. */
 export const weekdayOf = (d: Date) => (d.getDay() + 6) % 7;
 
-export function startOfWeek(now: Date): Date {
+/** Position of a weekday within a week that starts on `weekStart`. */
+export const dayPosition = (weekday: number, weekStart = 0) => (weekday - weekStart + 7) % 7;
+
+/** The weekdays in order for a week starting on `weekStart`. */
+export const weekOrder = (weekStart = 0) => Array.from({ length: 7 }, (_, i) => (weekStart + i) % 7);
+
+export function startOfWeek(now: Date, weekStart = 0): Date {
   const d = new Date(now);
   d.setHours(0, 0, 0, 0);
-  d.setDate(d.getDate() - weekdayOf(d));
+  d.setDate(d.getDate() - dayPosition(weekdayOf(d), weekStart));
   return d;
 }
 
 /** What's due in a routine right now. Entries whose workout was deleted are skipped. */
-export function routineStatus(r: Pick<Routine, 'mode' | 'entries' | 'startedAt'>, runs: RoutineRun[], now: Date): RoutineStatus {
+export function routineStatus(r: Pick<Routine, 'mode' | 'entries' | 'startedAt'>, runs: RoutineRun[], now: Date, weekStart = 0): RoutineStatus {
   const entries = r.entries.filter((e) => e.workoutName != null);
   if (!entries.length) return { kind: 'empty' };
   const since = Date.parse(r.startedAt);
@@ -95,11 +102,13 @@ export function routineStatus(r: Pick<Routine, 'mode' | 'entries' | 'startedAt'>
   const valid = runs.filter((x) => ids.has(x.entryId) && Date.parse(x.startedAt) >= since).sort((a, b) => Date.parse(b.startedAt) - Date.parse(a.startedAt));
 
   if (r.mode === 'weekly') {
-    const weekStart = startOfWeek(now).getTime();
+    const weekBegins = startOfWeek(now, weekStart).getTime();
     const todayIdx = weekdayOf(now);
-    const doneThisWeek = (e: RoutineEntry) => valid.find((x) => x.entryId === e.id && Date.parse(x.startedAt) >= weekStart)?.startedAt ?? null;
+    const doneThisWeek = (e: RoutineEntry) => valid.find((x) => x.entryId === e.id && Date.parse(x.startedAt) >= weekBegins)?.startedAt ?? null;
     const today = entries.filter((e) => e.weekday === todayIdx).map((entry) => ({ entry, doneAt: doneThisWeek(entry) }));
-    const missed = entries.filter((e) => e.weekday != null && e.weekday < todayIdx && !doneThisWeek(e));
+    const missed = entries
+      .filter((e) => e.weekday != null && dayPosition(e.weekday, weekStart) < dayPosition(todayIdx, weekStart) && !doneThisWeek(e))
+      .sort((a, b) => dayPosition(a.weekday!, weekStart) - dayPosition(b.weekday!, weekStart));
     let upcoming: { weekday: number; entries: RoutineEntry[] } | null = null;
     if (!today.length) {
       for (let k = 1; k <= 7 && !upcoming; k++) {
@@ -134,11 +143,12 @@ export function routineContextFor(
   routines: Routine[],
   now: Date,
   extraRuns: (RoutineRun & { routineId: string })[] = [],
+  weekStart = 0,
 ): { routineId: string; entryId: string } | null {
   for (const r of routines) {
     if (!r.active) continue;
     const runs = [...r.runs, ...extraRuns.filter((x) => x.routineId === r.id)];
-    const hit = dueEntries(routineStatus(r, runs, now)).find((e) => e.workoutId === workoutId);
+    const hit = dueEntries(routineStatus(r, runs, now, weekStart)).find((e) => e.workoutId === workoutId);
     if (hit) return { routineId: r.id, entryId: hit.id };
   }
   return null;

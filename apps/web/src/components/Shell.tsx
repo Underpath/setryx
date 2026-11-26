@@ -1,17 +1,58 @@
-import type { ReactNode } from 'react';
-import { Link, NavLink, Outlet } from 'react-router';
+import { type ReactNode, useEffect, useRef, useState } from 'react';
+import { Link, NavLink, Outlet, useLocation } from 'react-router';
 import type { PublicUser } from '@setryx/shared';
+import { useLogout } from '../session.ts';
 import { Icon } from './ui.tsx';
 
 const tabs = [
   { to: '/', label: 'Today', icon: 'today' },
   { to: '/workouts', label: 'Workouts', icon: 'workouts' },
+  { to: '/routines', label: 'Routines', icon: 'routines' },
   { to: '/library', label: 'Library', icon: 'library' },
   { to: '/stats', label: 'Stats', icon: 'stats' },
 ] as const;
 
 export function initials(user: PublicUser): string {
   return (user.displayName.trim()[0] ?? user.username[0] ?? '?').toUpperCase();
+}
+
+/** The avatar button and its short menu: settings and sign out. */
+export function AvatarMenu({ user, placement = 'below' }: { user: PublicUser; placement?: 'below' | 'beside' }) {
+  const [open, setOpen] = useState(false);
+  const wrap = useRef<HTMLDivElement>(null);
+  const logout = useLogout();
+  const { pathname } = useLocation();
+
+  useEffect(() => setOpen(false), [pathname]);
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: PointerEvent) => !wrap.current?.contains(e.target as Node) && setOpen(false);
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setOpen(false);
+    document.addEventListener('pointerdown', onDown);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('pointerdown', onDown);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [open]);
+
+  return (
+    <div className={`avatar-wrap ${placement}`} ref={wrap}>
+      <button className="avatar" type="button" aria-haspopup="menu" aria-expanded={open} aria-label={`${user.displayName}: account menu`} onClick={() => setOpen(!open)}>
+        {initials(user)}
+      </button>
+      {open && (
+        <div className="avatar-menu" role="menu">
+          <div className="am-who">
+            <b>{user.displayName}</b>
+            <span>{user.username}</span>
+          </div>
+          <Link role="menuitem" className="am-item" to="/settings">Settings</Link>
+          <button role="menuitem" className="am-item" type="button" onClick={() => logout.mutate()} disabled={logout.isPending}>Sign out</button>
+        </div>
+      )}
+    </div>
+  );
 }
 
 export function Shell({ user }: { user: PublicUser }) {
@@ -24,7 +65,9 @@ export function Shell({ user }: { user: PublicUser }) {
             {t.label}
           </NavLink>
         ))}
-        <Link className="avatar rail-avatar" to="/settings" aria-label="Settings">{initials(user)}</Link>
+        <div className="rail-avatar">
+          <AvatarMenu user={user} placement="beside" />
+        </div>
       </nav>
       <main className="shell-main">
         <Outlet />
@@ -33,7 +76,7 @@ export function Shell({ user }: { user: PublicUser }) {
   );
 }
 
-/** Screen title row. On phones the avatar (settings) sits here; on wide screens it moves to the rail. */
+/** Screen title row. On phones the avatar menu sits here; on wide screens it moves to the rail. */
 export function TopBar({ title, user, back, actions }: { title: string; user?: PublicUser; back?: string; actions?: ReactNode }) {
   return (
     <header className="topbar">
@@ -42,7 +85,7 @@ export function TopBar({ title, user, back, actions }: { title: string; user?: P
       )}
       <h1 className="h2">{title}</h1>
       {actions}
-      {user && <Link className="avatar" to="/settings" aria-label="Settings">{initials(user)}</Link>}
+      {user && <div className="topbar-avatar"><AvatarMenu user={user} /></div>}
     </header>
   );
 }

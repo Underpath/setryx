@@ -1,25 +1,28 @@
 import { useMemo } from 'react';
 import { Link } from 'react-router';
-import { type Routine, type RoutineEntry, type RoutineRun, type RoutineStatus, WEEKDAYS, routineStatus, startOfWeek, weekdayOf } from '@setryx/shared';
+import { type Routine, type RoutineEntry, type RoutineRun, type RoutineStatus, WEEKDAYS, dayPosition, routineStatus, startOfWeek, weekOrder, weekdayOf } from '@setryx/shared';
+import { useMe } from '../session.ts';
 import { useRoutines } from '../data.ts';
 import { pendingRuns, useOutbox } from '../sync/outbox.ts';
 
 export const MODE_LABEL: Record<Routine['mode'], string> = { repeat: 'Repeats', once: 'Once through', weekly: 'Weekly' };
 
-export type RoutineWithStatus = { routine: Routine; runs: RoutineRun[]; status: RoutineStatus };
+export type RoutineWithStatus = { routine: Routine; runs: RoutineRun[]; status: RoutineStatus; weekStart: number };
 
 /** Every routine with what's due, counting sessions still waiting to upload. */
-export function useRoutineStatuses(userId: string) {
+export function useRoutineStatuses(userId: string, weekStartOverride?: number) {
   const q = useRoutines();
+  const me = useMe();
+  const weekStart = weekStartOverride ?? me.data?.settings.weekStart ?? 0;
   const outbox = useOutbox(userId);
   const list = useMemo((): RoutineWithStatus[] => {
     const extra = pendingRuns(outbox);
     const now = new Date();
     return (q.data ?? []).map((routine) => {
       const runs = [...routine.runs, ...extra.filter((x) => x.routineId === routine.id && !routine.runs.some((r) => r.entryId === x.entryId && r.startedAt === x.startedAt))];
-      return { routine, runs, status: routineStatus(routine, runs, now) };
+      return { routine, runs, status: routineStatus(routine, runs, now, weekStart), weekStart };
     });
-  }, [q.data, outbox]);
+  }, [q.data, outbox, weekStart]);
   return { query: q, list };
 }
 
@@ -40,18 +43,19 @@ const startOfDay = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDat
  * The routine as a strip: the rotation in order (done, next, to come), or the
  * week Monday to Sunday (done, today, missed, planned).
  */
-export function RoutineStrip({ routine, runs, status }: RoutineWithStatus) {
+export function RoutineStrip({ routine, runs, status, weekStart }: RoutineWithStatus) {
   const entries = routine.entries.filter((e) => e.workoutName != null);
   if (routine.mode === 'weekly') {
-    const weekStart = startOfWeek(new Date()).getTime();
+    const weekBegins = startOfWeek(new Date(), weekStart).getTime();
     const today = weekdayOf(new Date());
-    const doneIds = new Set(runs.filter((r) => Date.parse(r.startedAt) >= weekStart).map((r) => r.entryId));
+    const doneIds = new Set(runs.filter((r) => Date.parse(r.startedAt) >= weekBegins).map((r) => r.entryId));
     return (
       <ol className="week-strip" aria-label="This week">
-        {WEEKDAYS.map((name, day) => {
+        {weekOrder(weekStart).map((day) => {
+          const name = WEEKDAYS[day]!;
           const list = entries.filter((e) => e.weekday === day);
           const done = list.length > 0 && list.every((e) => doneIds.has(e.id));
-          const missed = day < today && list.some((e) => !doneIds.has(e.id));
+          const missed = dayPosition(day, weekStart) < dayPosition(today, weekStart) && list.some((e) => !doneIds.has(e.id));
           const cls = ['day', list.length ? 'planned' : '', done ? 'done' : '', missed ? 'missed' : '', day === today ? 'today' : ''].filter(Boolean).join(' ');
           const what = list.length ? `${list.map((e) => e.workoutName).join(', ')}${done ? ', done' : missed ? ', missed' : ''}` : 'rest day';
           return (

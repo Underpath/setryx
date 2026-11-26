@@ -64,6 +64,22 @@ test('weekly: today, missed earlier this week, and the next day when today is fr
   assert.ok(s3.kind === 'week' && s3.upcoming?.weekday === 0, 'wraps to next Monday');
 });
 
+test('weekly with the week starting on Sunday', () => {
+  const entries = [entry('sun', 6), entry('mon', 0), entry('thu', 3)];
+  const r = { ...base, mode: 'weekly' as const, entries };
+  assert.equal(startOfWeek(now, 6).getDate(), 22, 'Sunday the 22nd');
+  const s = routineStatus(r, [], now, 6);
+  assert.ok(s.kind === 'week');
+  if (s.kind !== 'week') return;
+  assert.deepEqual(s.missed.map((e) => e.id), ['sun', 'mon'], 'Sunday comes first and is already missed');
+  // Done on Sunday the 22nd: counts for this week only when the week starts on Sunday.
+  const sundayRun = [run('sun', new Date('2026-11-22T10:00:00').toISOString())];
+  const s6 = routineStatus(r, sundayRun, now, 6);
+  assert.ok(s6.kind === 'week' && !s6.missed.some((e) => e.id === 'sun'));
+  const s0 = routineStatus(r, sundayRun, now, 0);
+  assert.ok(s0.kind === 'week' && !s0.missed.some((e) => e.id === 'sun'), 'with a Monday start, Sunday is later this week, not missed');
+});
+
 test('a workout started on its own counts for the routine waiting on it', () => {
   const r: Routine = { ...base, id: 'r1', name: 'PPL', mode: 'repeat', active: true, runs: [run('pushA', '2026-11-20T10:00:00Z')], createdAt: '', updatedAt: '' };
   assert.deepEqual(routineContextFor('w-pullA', [r], now), { routineId: 'r1', entryId: 'pullA' });

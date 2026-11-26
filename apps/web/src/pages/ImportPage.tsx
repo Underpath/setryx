@@ -45,7 +45,7 @@ export function ImportPage() {
   return (
     <main className="editor">
       <header className="topbar editor-bar">
-        <Link className="icon-btn" to="/workouts" aria-label="Back to workouts"><Icon name="back" /></Link>
+        <button className="icon-btn" type="button" aria-label="Back" onClick={() => (window.history.state?.idx > 0 ? navigate(-1) : navigate('/settings/data'))}><Icon name="back" /></button>
         <h1 className="h2">Import routines</h1>
       </header>
 
