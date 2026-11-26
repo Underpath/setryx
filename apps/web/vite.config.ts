@@ -39,6 +39,13 @@ export default defineConfig({
         // Read-only data needed to start a workout with no connection. Network
         // first: the cache is only used when the server can't be reached.
         runtimeCaching: [
+          // Exercise photos: from the server while it's reachable (so turning them off takes effect),
+          // and the ones you've seen from the cache in a gym with no signal.
+          {
+            urlPattern: ({ url, request }) => request.method === 'GET' && url.pathname.startsWith('/api/v1/exercise-images/'),
+            handler: 'NetworkFirst',
+            options: { cacheName: 'setryx-photos', networkTimeoutSeconds: 4, expiration: { maxEntries: 400 }, cacheableResponse: { statuses: [200] } },
+          },
           {
             urlPattern: ({ url, request }) =>
               request.method === 'GET' && /^\/api\/v1\/(auth\/me|setup|workouts|exercises|routines)/.test(url.pathname),

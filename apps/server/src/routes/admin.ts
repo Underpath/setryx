@@ -6,7 +6,9 @@ import {
   appSettingsSchema,
   createInviteRequestSchema,
 } from '@setryx/shared';
+import { z } from 'zod';
 import { requireAdmin } from '../app.ts';
+import { imagesAllowed, imagesStatus, removeAllImages, setImagesAllowed, startDownloadAll } from '../exercise-images.ts';
 import { tx } from '../db.ts';
 import { HttpError, parse } from '../http.ts';
 import { createInvite, deleteInvite, listInvites } from '../invites.ts';
@@ -92,6 +94,26 @@ export const adminRoutes: FastifyPluginAsync = async (app) => {
   app.delete<IdParams>('/invites/:id', async (req, reply) => {
     if (!deleteInvite(db, req.params.id)) throw new HttpError(404, 'not_found', 'No open invite with that id.');
     return reply.status(204).send();
+  });
+
+  // ── Exercise photos ──
+  app.get('/exercise-images', async () => imagesStatus(db, app.config.dataDir));
+
+  app.patch('/exercise-images', async (req) => {
+    const { allowed } = parse(z.object({ allowed: z.boolean() }), req.body);
+    setImagesAllowed(db, allowed);
+    return imagesStatus(db, app.config.dataDir);
+  });
+
+  app.post('/exercise-images/download', async () => {
+    if (!imagesAllowed(db)) throw new HttpError(409, 'not_allowed', 'Turn on exercise photos first.');
+    startDownloadAll(db, app.config.dataDir);
+    return imagesStatus(db, app.config.dataDir);
+  });
+
+  app.delete('/exercise-images', async () => {
+    await removeAllImages(app.config.dataDir);
+    return imagesStatus(db, app.config.dataDir);
   });
 
   // ── Server settings ──

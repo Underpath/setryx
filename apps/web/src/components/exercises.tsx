@@ -64,7 +64,7 @@ export function ExercisePhotos({ images, name }: { images: string[]; name: strin
     <div className="ex-photos">
       {shown.map((p, i) => (
         <figure key={p}>
-          <img src={`/api/v1/exercise-images/${p}`} alt={`${name}, ${i === 0 ? 'start' : 'end'} position`} loading="lazy" onError={() => setFailed((f) => [...f, p])} />
+          <img src={`/api/v1/exercise-images/${p}?v=2`} alt={`${name}, ${i === 0 ? 'start' : 'end'} position`} loading="lazy" onError={() => setFailed((f) => [...f, p])} />
           <figcaption>{i === 0 ? 'Start' : 'End'}</figcaption>
         </figure>
       ))}

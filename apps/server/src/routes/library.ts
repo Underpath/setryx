@@ -13,6 +13,7 @@ import {
   updateCustomExercise,
 } from '../exercises.ts';
 import { HttpError, parse } from '../http.ts';
+import { fetchImage, imagesAllowed, imagesDir, isKnownImage, isValidPath } from '../exercise-images.ts';
 
 const searchQuerySchema = z.object({
   q: z.string().trim().max(100).optional(),
@@ -29,16 +30,20 @@ export const libraryRoutes: FastifyPluginAsync = async (app) => {
   const { db } = app;
   app.addHook('preHandler', async (req) => void requireUser(req));
 
-  // Exercise photos, served only if they've been placed in /data/exercise-images.
+  // Exercise photos: only when an admin allows them. Missing ones are fetched on first view.
   app.get<{ Params: { dir: string; file: string } }>('/exercise-images/:dir/:file', async (req, reply) => {
-    const { dir, file } = req.params;
-    if (!/^[A-Za-z0-9_()'.,-]{1,120}$/.test(dir) || dir.includes('..') || !/^\d{1,2}\.jpg$/.test(file)) throw new HttpError(404, 'not_found', 'No such image.');
+    const path = `${req.params.dir}/${req.params.file}`;
+    const notFound = new HttpError(404, 'not_found', 'No such image.');
+    if (!isValidPath(path) || !imagesAllowed(db)) throw notFound;
+    const file = join(imagesDir(app.config.dataDir), path);
+    let data: Buffer;
     try {
-      const data = await readFile(join(app.config.dataDir, 'exercise-images', dir, file));
-      return reply.header('Content-Type', 'image/jpeg').header('Cache-Control', 'private, max-age=604800').send(data);
+      data = await readFile(file);
     } catch {
-      throw new HttpError(404, 'not_found', 'No such image.');
+      if (!isKnownImage(db, path) || !(await fetchImage(app.config.dataDir, path))) throw notFound;
+      data = await readFile(file);
     }
+    return reply.header('Content-Type', 'image/jpeg').header('Cache-Control', 'private, no-cache').send(data);
   });
 
   app.get('/exercises', async (req) => {

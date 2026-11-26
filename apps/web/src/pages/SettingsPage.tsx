@@ -1,5 +1,5 @@
 import { type FormEvent, useState } from 'react';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, NavLink, Navigate, Outlet, useNavigate, useParams } from 'react-router';
 import { type PublicUser, type UpdateMeRequest, type UserSettings, WEEKDAYS } from '@setryx/shared';
 import { api } from '../api.ts';
@@ -8,13 +8,14 @@ import { Field, FormError, Icon, Sheet, Switch, fieldErrors, useToast } from '..
 import { useMediaQuery } from '../util.ts';
 import { InvitesSection, UsersSection } from './AdminPage.tsx';
 
-type SectionId = 'account' | 'workouts' | 'general' | 'data' | 'people';
+type SectionId = 'account' | 'workouts' | 'general' | 'data' | 'people' | 'photos';
 const SECTIONS: { id: SectionId; label: string; hint: string; admin?: boolean }[] = [
   { id: 'account', label: 'Account', hint: 'Name and password' },
   { id: 'workouts', label: 'During workouts', hint: 'Tapping, screen, sounds, warning' },
   { id: 'general', label: 'General', hint: 'Theme and start of the week' },
   { id: 'data', label: 'Import and export', hint: 'Bring workouts in, take everything out' },
   { id: 'people', label: 'People and invites', hint: 'Accounts on this server', admin: true },
+  { id: 'photos', label: 'Exercise photos', hint: 'Allow, download or remove', admin: true },
 ];
 const WIDE = '(min-width: 760px)';
 
@@ -107,9 +108,112 @@ export function SettingsSection() {
           <InvitesSection />
         </>
       ) : null;
+    case 'photos':
+      return user.role === 'admin' ? <PhotosSection /> : null;
     default:
       return null;
   }
+}
+
+type ImagesStatus = {
+  allowed: boolean;
+  total: number;
+  downloaded: number;
+  bytes: number;
+  estimatedTotalBytes: number;
+  job: { running: boolean; total: number; done: number; failed: number; finishedAt: string | null };
+};
+
+const mb = (bytes: number) => {
+  const v = bytes / 1_000_000;
+  return `${v < 10 ? v.toFixed(1) : Math.round(v)} MB`;
+};
+
+/** Admin: whether exercise photos are allowed, and downloading or removing them. */
+function PhotosSection() {
+  const qc = useQueryClient();
+  const toast = useToast();
+  const [confirmRemove, setConfirmRemove] = useState(false);
+  const status = useQuery({
+    queryKey: ['admin', 'images'],
+    queryFn: () => api.get<ImagesStatus>('/admin/exercise-images'),
+    refetchInterval: (q) => (q.state.data?.job.running ? 1000 : false),
+  });
+  const set = (data: ImagesStatus) => qc.setQueryData(['admin', 'images'], data);
+  const allow = useMutation({ mutationFn: (allowed: boolean) => api.patch<ImagesStatus>('/admin/exercise-images', { allowed }), onSuccess: set, onError: (e) => toast(e.message) });
+  const download = useMutation({ mutationFn: () => api.post<ImagesStatus>('/admin/exercise-images/download'), onSuccess: set, onError: (e) => toast(e.message) });
+  const remove = useMutation({
+    mutationFn: () => api.del<ImagesStatus>('/admin/exercise-images'),
+    onSuccess: (d) => (set(d), setConfirmRemove(false), toast('Downloaded photos removed')),
+    onError: (e) => toast(e.message),
+  });
+  const s = status.data;
+  if (!s) return <FormError error={status.error} />;
+  const job = s.job;
+  const all = s.downloaded >= s.total;
+  return (
+    <>
+      <ul className="rows">
+        <li className="row">
+          <Switch
+            label="Allow exercise photos"
+            hint={`Start and end photos for library exercises, from the free-exercise-db project on GitHub (public domain). When allowed, each photo downloads the first time someone opens that exercise and then stays on this server. All ${s.total.toLocaleString()} photos come to about ${mb(s.estimatedTotalBytes)}.`}
+            checked={s.allowed}
+            onChange={(v) => allow.mutate(v)}
+          />
+        </li>
+        {!s.allowed && (
+          <li className="row">
+            <div className="main">
+              <div className="meta">While this is off, nothing is downloaded and no photos are shown.{s.downloaded > 0 ? ` ${s.downloaded.toLocaleString()} photos (${mb(s.bytes)}) are still stored from before.` : ''}</div>
+            </div>
+          </li>
+        )}
+        {s.allowed && (
+          <li className="row photos-status">
+            <div className="main">
+              <div className="name">{all ? 'All photos are on this server' : `${s.downloaded.toLocaleString()} of ${s.total.toLocaleString()} photos on this server`}</div>
+              <div className="meta">
+                {mb(s.bytes)} used.
+                {job.running
+                  ? ` Downloading: ${job.done + job.failed} of ${job.total}.`
+                  : !all
+                    ? ' The rest download as people open exercises, or get them all now.'
+                    : ''}
+                {!job.running && job.failed > 0 && job.finishedAt ? ` ${job.failed} couldn’t be downloaded; try again later.` : ''}
+              </div>
+              {job.running && (
+                <div className="meter" role="progressbar" aria-label="Downloading photos" aria-valuemin={0} aria-valuemax={job.total} aria-valuenow={job.done + job.failed}>
+                  <i style={{ width: `${((job.done + job.failed) / Math.max(1, job.total)) * 100}%` }} />
+                </div>
+              )}
+            </div>
+            {!all && !job.running && (
+              <button className="btn btn-strong btn-sm" type="button" disabled={download.isPending} onClick={() => download.mutate()}>
+                Download all (about {mb(Math.max(0, s.estimatedTotalBytes - s.bytes))})
+              </button>
+            )}
+          </li>
+        )}
+      </ul>
+      {s.downloaded > 0 && (
+        <div className="split-actions">
+          <span />
+          <button className="btn btn-quiet btn-danger btn-sm" type="button" onClick={() => setConfirmRemove(true)}>Remove downloaded photos</button>
+        </div>
+      )}
+      {confirmRemove && (
+        <Sheet title="Remove downloaded photos?" onClose={() => setConfirmRemove(false)}>
+          <p className="muted">
+            Deletes the {s.downloaded.toLocaleString()} photos ({mb(s.bytes)}) stored on this server.
+            {s.allowed ? ' While photos are allowed, they download again as people open exercises.' : ''}
+          </p>
+          <button className="btn btn-primary btn-block" type="button" disabled={remove.isPending} onClick={() => remove.mutate()}>Remove photos</button>
+          <button className="btn btn-block" type="button" onClick={() => setConfirmRemove(false)}>Keep them</button>
+        </Sheet>
+      )}
+    </>
+  );
 }
 
 function AccountSection({ user }: { user: PublicUser }) {
