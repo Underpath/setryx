@@ -99,3 +99,13 @@ npm run dev
 The API runs on :38471 and Vite on :5173 (it proxies `/api`). Other commands: `npm test` runs the API tests, `npm run typecheck` checks types, and `npm run build` builds the web app into `apps/web/dist`, which the server serves.
 
 Layout: `apps/server` (Fastify + built-in `node:sqlite`), `apps/web` (React + Vite), `packages/shared` (Zod schemas used by both).
+
+### End-to-end test
+
+A full workout (first-run setup, playing a workout, the review, saving, Stats) runs in a real browser, entirely in containers: a throwaway setryx built from the current code with an empty database, and Microsoft's Playwright image with Chromium. Nothing is installed on your machine.
+
+```bash
+sh e2e/run.sh
+```
+
+It starts from an empty database every time and removes the test copy of setryx when it's done. The Playwright image is a large one-off download (Docker lists it at about 3.5 GB); remove it with `docker rmi mcr.microsoft.com/playwright:v1.55.0-noble` when you no longer need it.

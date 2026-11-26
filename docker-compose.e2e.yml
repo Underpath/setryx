@@ -1,0 +1,35 @@
+# End-to-end test in containers: nothing is installed on the host.
+#   sh e2e/run.sh      (fresh database each run, cleans up after)
+# The app runs from the current code with an empty, temporary database; it never
+# touches the real setryx container or its volume.
+name: setryx-e2e
+
+services:
+  app:
+    build: .
+    image: setryx:e2e
+    tmpfs:
+      - /data:uid=1000,gid=1000
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:38471/api/health').then(r=>process.exit(r.ok?0:1),()=>process.exit(1))"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+
+  e2e:
+    image: mcr.microsoft.com/playwright:v1.55.0-noble
+    depends_on:
+      app:
+        condition: service_healthy
+    environment:
+      BASE_URL: http://app:38471
+      CI: "1"
+    volumes:
+      - ./e2e:/e2e:ro
+    working_dir: /work
+    # The test library is installed inside this container only, and goes with it.
+    command: >
+      sh -c "cp -r /e2e/. /work/ &&
+             npm init -y >/dev/null &&
+             npm install --no-audit --no-fund --loglevel=error @playwright/test@1.55.0 >/dev/null &&
+             npx playwright test"
