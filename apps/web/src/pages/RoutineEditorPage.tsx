@@ -244,7 +244,7 @@ export function RoutineEditorPage() {
             <Switch label="Active" hint="Paused routines don’t show on Today." checked={draft.active} onChange={(v) => setDraft({ ...draft, active: v })} />
           </div>
           <div className="split-actions">
-            <button className="btn btn-strong btn-sm" type="button" onClick={() => setConfirm('restart')} disabled={dirty}>Reset start</button>
+            <button className="btn btn-strong btn-sm" type="button" onClick={() => setConfirm('restart')} disabled={dirty}>Reset progress</button>
             <button className="btn btn-quiet btn-danger btn-sm" type="button" onClick={() => setConfirm('delete')}>Delete routine</button>
           </div>
         </section>
@@ -280,10 +280,10 @@ export function RoutineEditorPage() {
       )}
 
       {confirm === 'restart' && (
-        <Sheet title="Reset the start of this routine?" onClose={() => setConfirm(null)}>
+        <Sheet title="Reset progress?" onClose={() => setConfirm(null)}>
           <p className="muted">Up next goes back to the first workout. Your past sessions stay in your history.</p>
-          <button className="btn btn-primary btn-block" type="button" disabled={restart.isPending} onClick={() => restart.mutate(id!, { onSuccess: () => (toast('Routine start reset'), setConfirm(null)) })}>
-            Reset start
+          <button className="btn btn-primary btn-block" type="button" disabled={restart.isPending} onClick={() => restart.mutate(id!, { onSuccess: () => (toast('Progress reset'), setConfirm(null)) })}>
+            Reset progress
           </button>
           <button className="btn btn-block" type="button" onClick={() => setConfirm(null)}>Cancel</button>
         </Sheet>

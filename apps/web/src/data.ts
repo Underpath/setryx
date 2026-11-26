@@ -1,6 +1,10 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type {
+  Bests,
   Exercise,
+  ExerciseHistoryEntry,
+  ExerciseStat,
+  SessionPoint,
   ExerciseInput,
   ImportChoice,
   Routine,
@@ -135,7 +139,39 @@ export function useDeleteSession() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => api.del(`/sessions/${id}`),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['sessions'] }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['sessions'] });
+      void qc.invalidateQueries({ queryKey: ['stats'] });
+    },
+  });
+}
+
+// ── Stats ──
+export function useStatSessions(days = 400) {
+  return useQuery({ queryKey: ['stats', 'sessions', days], queryFn: async () => (await api.get<{ sessions: SessionPoint[] }>(`/stats/sessions?days=${days}`)).sessions });
+}
+
+export function useExerciseStats() {
+  return useQuery({ queryKey: ['stats', 'exercises'], queryFn: async () => (await api.get<{ exercises: ExerciseStat[] }>('/stats/exercises')).exercises });
+}
+
+export function useExerciseHistory(id: string | undefined) {
+  return useQuery({
+    queryKey: ['stats', 'exercise', id],
+    queryFn: () => api.get<{ exerciseId: string; name: string; entries: ExerciseHistoryEntry[] }>(`/stats/exercises/${id}`),
+    enabled: !!id,
+  });
+}
+
+/** Bests before a session, for spotting records on its review. Offline it just fails and no records show. */
+export function useBests(ids: string[], excludeSessionId: string) {
+  const key = [...ids].sort().join(',');
+  return useQuery({
+    queryKey: ['stats', 'bests', key, excludeSessionId],
+    queryFn: async () => (await api.get<{ bests: Record<string, Bests> }>(`/stats/bests?ids=${encodeURIComponent(key)}&exclude=${excludeSessionId}`)).bests,
+    enabled: ids.length > 0,
+    retry: false,
+    staleTime: Infinity,
   });
 }
 

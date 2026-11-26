@@ -144,6 +144,7 @@ export function SyncRunner({ userId }: { userId: string }) {
       const r = await flushOutbox(userId);
       if (r.sent.length) {
         void qc.invalidateQueries({ queryKey: ['sessions'] });
+        void qc.invalidateQueries({ queryKey: ['stats'] });
         void qc.invalidateQueries({ queryKey: ['routines'] });
         for (const s of r.sent) {
           if (s.kind === 'targets') {

@@ -1,6 +1,8 @@
 import { useMemo, useState } from 'react';
 import { Navigate, useNavigate, useParams } from 'react-router';
-import { type PlayerState, type SetLog, type TargetSuggestion, adjustLog, elapsedMs, loggedSets, stepsOf, targetSuggestions } from '@setryx/shared';
+import { type NewRecord, type PlayerState, type SetLog, type TargetSuggestion, adjustLog, elapsedMs, emptyBests, loggedSets, newRecords, stepsOf, targetSuggestions } from '@setryx/shared';
+import { useBests } from '../data.ts';
+import { RECORD_LABEL, recordValue } from '../pages/ExerciseStatsPage.tsx';
 import { useMe } from '../session.ts';
 import { Sheet, useToast } from '../components/ui.tsx';
 import { useAllowNextNavigation } from '../components/backGuard.tsx';
@@ -60,6 +62,19 @@ function Review({ initial }: { initial: PlayerState }) {
   }, [sets]);
 
   const picked = suggestions.filter((s) => chosen[s.itemId]);
+
+  // Records: this session's sets against your bests from every other session.
+  const exerciseIds = useMemo(() => [...new Set(sets.map((l) => l.exerciseId))], [sets]);
+  const priorBests = useBests(exerciseIds, state.id);
+  const records = useMemo(() => {
+    if (!priorBests.data) return [] as (NewRecord & { exerciseId: string })[];
+    return exerciseIds.flatMap((id) =>
+      newRecords(
+        sets.filter((l) => l.exerciseId === id).map((l) => ({ reps: l.actualReps, weight: l.actualWeight, durationS: l.actualDurationS })),
+        priorBests.data[id] ?? emptyBests(),
+      ).map((r) => ({ ...r, exerciseId: id })),
+    );
+  }, [priorBests.data, exerciseIds, sets]);
   const suggestionFor = (itemId: string) => suggestions.find((s) => s.itemId === itemId);
 
   const save = async () => {
@@ -92,7 +107,24 @@ function Review({ initial }: { initial: PlayerState }) {
         <div><b>{duration(elapsedMs(state, state.finishedAt ?? Date.now()))}</b>duration</div>
         <div><b>{sets.length}</b>sets</div>
         <div><b>{Math.round(volume).toLocaleString()}</b>kg moved</div>
+        {records.length > 0 && <div className="records-tile"><b>{records.length}</b>record{records.length === 1 ? '' : 's'}</div>}
       </div>
+      {records.length > 0 && (
+        <section className="section review-records" aria-label="New records">
+          <h2 className="h3">New records</h2>
+          <ul className="rows">
+            {records.map((r) => (
+              <li className="row" key={`${r.exerciseId}-${r.kind}`}>
+                <span className="record-mark" aria-hidden />
+                <div className="main">
+                  <div className="name">{name(r.exerciseId)}</div>
+                  <div className="meta">{RECORD_LABEL[r.kind]}: <b>{recordValue(r.kind, r.value)}</b>, up from {recordValue(r.kind, r.previous)}</div>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
       {sets.length < steps.filter((s) => s.kind === 'exercise').length && (
         <p className="small muted" style={{ marginTop: 10 }}>Ended early: {sets.length} of {steps.filter((s) => s.kind === 'exercise').length} sets done.</p>
       )}

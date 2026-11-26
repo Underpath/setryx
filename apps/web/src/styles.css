@@ -19,6 +19,8 @@
   --purple-text: var(--purple);
   --danger-bg: #F1E9FC;
   --red-text: #C42B2B;
+  --chart-1: #3A66E0; --chart-1-strong: var(--blue);
+  --heat-0: #DDE1DE; --heat-1: #8CA4EC; --heat-2: #5277E2; --heat-3: var(--blue);
 
   --display: "Big Shoulders Display", "Arial Narrow", sans-serif;
   --body: "Atkinson Hyperlegible", system-ui, sans-serif;
@@ -27,13 +29,13 @@
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     --bg: var(--rubber); --fg: var(--chalk); --muted: #A3ACB4; --rule: #333B42; --raise: #252B31;
-    --blue-text: #8FA9FF; --purple-text: #B794FF; --danger-bg: #2D2440; --red-text: #FF7A70;
+    --blue-text: #8FA9FF; --purple-text: #B794FF; --danger-bg: #2D2440; --red-text: #FF7A70; --chart-1: #5C82F0; --chart-1-strong: #8FA9FF; --heat-0: #2A3137; --heat-1: #3556B0; --heat-2: #5C82F0; --heat-3: #A9BDFF;
     color-scheme: dark;
   }
 }
 :root[data-theme="dark"] {
   --bg: var(--rubber); --fg: var(--chalk); --muted: #A3ACB4; --rule: #333B42; --raise: #252B31;
-  --blue-text: #8FA9FF; --purple-text: #B794FF; --danger-bg: #2D2440; --red-text: #FF7A70;
+  --blue-text: #8FA9FF; --purple-text: #B794FF; --danger-bg: #2D2440; --red-text: #FF7A70; --chart-1: #5C82F0; --chart-1-strong: #8FA9FF; --heat-0: #2A3137; --heat-1: #3556B0; --heat-2: #5C82F0; --heat-3: #A9BDFF;
   color-scheme: dark;
 }
 
@@ -356,7 +358,7 @@ textarea.input { resize: vertical; min-height: 88px; line-height: 1.45; }
 .start-footer { position: sticky; bottom: 0; background: var(--bg); padding: 16px 0 calc(16px + env(safe-area-inset-bottom)); margin-top: 20px; }
 .start-btn { min-height: 60px; font-size: 1.1rem; background: var(--green); }
 .done-screen { padding-top: 48px; }
-.summary { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; background: var(--rule); border-block: 1px solid var(--rule); margin-top: 18px; max-width: 520px; }
+.summary { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 1px; background: var(--rule); border-block: 1px solid var(--rule); margin-top: 18px; max-width: 520px; }
 .summary div { background: var(--bg); padding: 12px 0 12px 2px; font-size: .8rem; color: var(--muted); }
 .summary b { display: block; font: 800 2rem/1 var(--display); color: var(--fg); }
 .resume-banner { margin-top: 8px; padding: 14px 16px; border-radius: 16px; background: var(--green); color: var(--chalk); display: flex; align-items: center; gap: 12px; }
@@ -506,3 +508,60 @@ textarea.input { resize: vertical; min-height: 88px; line-height: 1.45; }
   .settings-body { grid-template-columns: 250px 1fr; gap: 36px; align-items: start; }
   .settings-tabs { position: sticky; top: 76px; }
 }
+
+/* ── Stats ── */
+.stat-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(96px, 1fr)); gap: 8px; margin-top: 8px; }
+@media (max-width: 480px) {
+  .stat-tile { padding: 12px 12px; }
+  .stat-tile .value, .stat-tile.streak .value { font-size: 2.1rem; }
+  .stat-tile .value small { display: block; margin: 4px 0 0; font-size: .8rem; }
+}
+.stat-tile { display: grid; gap: 2px; align-content: start; padding: 14px 16px; border-radius: 16px; background: var(--raise); border: 1px solid var(--rule); }
+.stat-tile .label { font-size: .8rem; font-weight: 700; color: var(--muted); }
+.stat-tile .value { font: 800 2.4rem/1 var(--display); font-variant-numeric: tabular-nums; }
+.stat-tile .value small { font: 700 1rem var(--body); color: var(--muted); margin-left: 6px; }
+.stat-tile .sub { font-size: .8rem; color: var(--muted); }
+.stat-tile.streak .value { font-size: 3rem; }
+.seg-sm { max-width: 100%; overflow-x: auto; scrollbar-width: none; }
+.seg-sm button { min-height: 32px; padding: 0 12px; font-size: .8rem; flex: none; }
+.section-head:has(.seg-sm) { flex-wrap: wrap; row-gap: 8px; }
+
+.chart { position: relative; width: 100%; margin-top: 6px; }
+.chart svg { display: block; overflow: visible; }
+.chart .grid, .chart .axis { stroke: var(--rule); stroke-width: 1; shape-rendering: crispEdges; }
+.chart .tick { font-size: 11px; fill: var(--muted); font-family: var(--body); }
+.chart .bar { fill: var(--chart-1); }
+.chart .bar.current { fill: var(--chart-1-strong); }
+.chart .hit { fill: transparent; cursor: pointer; outline: none; }
+.chart .hit:focus-visible { stroke: var(--blue); stroke-width: 2; }
+.chart .line { fill: none; stroke: var(--chart-1); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.chart .area { fill: var(--chart-1); opacity: .1; }
+.chart .dot { fill: var(--chart-1); stroke: var(--bg); stroke-width: 2; }
+.chart .dot.record { fill: var(--bg); stroke: var(--chart-1); stroke-width: 2.5; }
+.chart .dot.on { fill: var(--chart-1-strong); }
+.chart .crosshair { stroke: var(--muted); stroke-width: 1; }
+.chart .end-label { font: 700 12px var(--body); fill: var(--fg); }
+.line-chart { touch-action: pan-y; cursor: crosshair; outline: none; }
+.line-chart:focus-visible { outline: 2px solid var(--blue); outline-offset: 4px; border-radius: 8px; }
+.chart-tip { position: absolute; transform: translate(-50%, -100%); pointer-events: none; z-index: 5; background: var(--fg); color: var(--bg); border-radius: 10px; padding: 8px 10px; font-size: .8rem; line-height: 1.35; display: grid; min-width: 120px; max-width: 240px; box-shadow: 0 6px 18px rgba(0,0,0,.25); }
+.chart-tip b { font-weight: 700; }
+.chart-tip em { font-style: normal; font-weight: 700; }
+.chart-tip .tip-sets { opacity: .8; }
+
+/* Heatmap: one hue, empty → strong. Dark mode gets its own steps (mixed toward the dark surface). */
+.heatmap .cell { stroke: none; }
+.heatmap .cell.l0, .heat-key .l0 { fill: var(--heat-0); background: var(--heat-0); }
+.heatmap .cell.l1, .heat-key .l1 { fill: var(--heat-1); background: var(--heat-1); }
+.heatmap .cell.l2, .heat-key .l2 { fill: var(--heat-2); background: var(--heat-2); }
+.heatmap .cell.l3, .heat-key .l3 { fill: var(--heat-3); background: var(--heat-3); }
+.heat-key { display: flex; align-items: center; gap: 4px; font-size: .75rem; color: var(--muted); margin-top: 8px; }
+.heat-key i { width: 11px; height: 11px; border-radius: 3px; display: inline-block; }
+
+.data-table { width: 100%; border-collapse: collapse; font-size: .875rem; margin-top: 8px; }
+.data-table th { text-align: left; font-weight: 700; color: var(--muted); font-size: .8rem; padding: 6px 8px 6px 0; border-bottom: 1px solid var(--rule); }
+.data-table td { padding: 8px 8px 8px 0; border-bottom: 1px solid var(--rule); font-variant-numeric: tabular-nums; }
+.section .link-btn.small { margin-top: 8px; display: inline-block; color: var(--muted); }
+
+/* Records: a ringed marker, same as the record dots on the chart */
+.record-mark { width: 14px; height: 14px; border-radius: 999px; border: 2.5px solid var(--chart-1); flex: none; }
+.records-tile b { color: var(--blue-text); }

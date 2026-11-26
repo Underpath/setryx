@@ -16,6 +16,7 @@ import { PlayerRoute, ResumeRoute } from './player/PlayerPage.tsx';
 import { ReviewRoute } from './player/ReviewPage.tsx';
 import { RoutineEditorPage } from './pages/RoutineEditorPage.tsx';
 import { RoutinesPage } from './pages/RoutinesPage.tsx';
+import { ExerciseStatsPage } from './pages/ExerciseStatsPage.tsx';
 import { SyncRunner } from './sync/outbox.ts';
 
 const PUBLIC_PATHS = ['/login', '/signup', '/invite/'];
@@ -68,6 +69,7 @@ const Workouts = withUser(WorkoutsPage);
 const Library = withUser(LibraryPage);
 const Stats = withUser(StatsPage);
 const Routines = withUser(RoutinesPage);
+const ExerciseStats = withUser(ExerciseStatsPage);
 
 export const router = createBrowserRouter([
   {
@@ -103,6 +105,7 @@ export const router = createBrowserRouter([
           { path: '/routines', element: <Routines /> },
           { path: '/library', element: <Library /> },
           { path: '/stats', element: <Stats /> },
+          { path: '/stats/exercises/:id', element: <ExerciseStats /> },
         ],
       },
       { path: '*', element: <Navigate to="/" replace /> },
