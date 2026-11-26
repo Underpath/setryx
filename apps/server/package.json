@@ -7,7 +7,7 @@
   "scripts": {
     "dev": "node --watch --env-file-if-exists=../../stack.env src/main.ts",
     "start": "node src/main.ts",
-    "test": "node --test --test-reporter=spec test/",
+    "test": "node --test --test-reporter=spec 'test/*.test.ts'",
     "cli": "node src/cli.ts"
   },
   "dependencies": {
