@@ -244,8 +244,8 @@ export function RoutineEditorPage() {
             <Switch label="Active" hint="Paused routines don’t show on Today." checked={draft.active} onChange={(v) => setDraft({ ...draft, active: v })} />
           </div>
           <div className="split-actions">
-            <button className="btn btn-sm" type="button" onClick={() => setConfirm('restart')} disabled={dirty}>Start from the beginning</button>
-            <button className="btn btn-danger btn-sm" type="button" onClick={() => setConfirm('delete')}>Delete routine</button>
+            <button className="btn btn-quiet btn-sm" type="button" onClick={() => setConfirm('restart')} disabled={dirty}>Start from the beginning</button>
+            <button className="btn btn-quiet btn-danger btn-sm" type="button" onClick={() => setConfirm('delete')}>Delete routine</button>
           </div>
         </section>
       )}
