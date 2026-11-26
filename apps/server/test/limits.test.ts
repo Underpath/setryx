@@ -46,9 +46,9 @@ test('admins read and change the limits; others can’t, and bad values are refu
   await setLimits({ tokenPerMinute: null, maxTokensPerUser: 5 });
   assert.deepEqual((await asUser('GET', '/api/v1/admin/limits')).json(), { ...defaultLimitSettings, tokenPerMinute: null, maxTokensPerUser: 5 });
 
-  const bad = await asUser('PUT', '/api/v1/admin/limits', { ...defaultLimitSettings, appPerMinute: 5, signInPerMinute: 2.5 });
+  const bad = await asUser('PUT', '/api/v1/admin/limits', { ...defaultLimitSettings, tokenPerMinute: 5, signInPerMinute: 2.5 });
   assert.equal(bad.statusCode, 400);
-  assert.ok(bad.json().fields.appPerMinute);
+  assert.ok(bad.json().fields.tokenPerMinute);
   assert.ok(bad.json().fields.signInPerMinute);
 
   await asUser('POST', '/api/v1/admin/users', { username: 'pat', displayName: 'Pat', password: 'pat password 12', role: 'user' });
@@ -99,25 +99,45 @@ test('an MCP call counts once, however many API calls its tool makes, and batche
   assert.match(over.json().error.message, /more than 10 requests a minute/);
 });
 
-test('the app limit applies per person, and photos aren’t counted', async () => {
-  await setLimits({ appPerMinute: 60 });
-  // Lowering a limit caps what's left at the new value.
-  for (let i = 0; i < 60; i++) assert.equal((await asUser('GET', '/api/v1/workouts')).statusCode, 200);
-  assert.equal((await asUser('GET', '/api/v1/exercise-images/a/0.jpg')).statusCode, 404);
-  const over = await asUser('GET', '/api/v1/workouts');
+test('wrong passwords are counted per account, from any address, and include password changes', async () => {
+  await setLimits({ signInPerMinute: 3 });
+  await asUser('POST', '/api/v1/admin/users', { username: 'pat', displayName: 'Pat', password: 'pat password 12', role: 'user' });
+  const login = (username: string, password: string, ip = '10.0.0.1') =>
+    app.inject({ method: 'POST', url: '/api/v1/auth/login', payload: { username, password }, remoteAddress: ip });
+
+  for (let i = 0; i < 3; i++) assert.equal((await login('OWNER', 'wrong password 1', `10.0.0.${i}`)).statusCode, 401);
+  const over = await login('owner', 'owner password 1', '10.9.9.9'); // a new address and the right password still wait
   assert.equal(over.statusCode, 429);
-  assert.match(over.json().message, /^You made more than 60 requests a minute/);
+  assert.match(over.json().message, /Too many wrong passwords for this account/);
+  assert.ok(Number(over.headers['retry-after']) >= 1);
+  const change = await asUser('POST', '/api/v1/me/password', { currentPassword: 'owner password 1', newPassword: 'another password 1' });
+  assert.equal(change.statusCode, 429);
+
+  // Other accounts, and right passwords, aren't affected.
+  for (let i = 0; i < 5; i++) assert.equal((await login('pat', 'pat password 12')).statusCode, 200);
+  // Unknown names get the same treatment, so refusals don't reveal who has an account.
+  for (let i = 0; i < 3; i++) assert.equal((await login('nobody', 'wrong password 1')).statusCode, 401);
+  assert.equal((await login('nobody', 'wrong password 1')).statusCode, 429);
 });
 
-test('sign-in attempts follow the admin’s limit, and token count is capped', async () => {
-  await setLimits({ signInPerMinute: 3, maxTokensPerUser: 1 });
-  const login = () => app.inject({ method: 'POST', url: '/api/v1/auth/login', payload: { username: 'owner', password: 'wrong password 1' } });
-  for (let i = 0; i < 3; i++) assert.equal((await login()).statusCode, 401);
-  assert.equal((await login()).statusCode, 429);
+test('wrong current passwords count against the account’s sign-in limit', async () => {
+  await setLimits({ signInPerMinute: 3 });
+  for (let i = 0; i < 3; i++) {
+    assert.equal((await asUser('POST', '/api/v1/me/password', { currentPassword: 'wrong password 1', newPassword: 'another password 1' })).statusCode, 400);
+  }
+  const login = await app.inject({ method: 'POST', url: '/api/v1/auth/login', payload: { username: 'owner', password: 'owner password 1' } });
+  assert.equal(login.statusCode, 429);
+});
 
+test('token count is capped', async () => {
+  await setLimits({ maxTokensPerUser: 1 });
   await newToken();
   const second = await asUser('POST', '/api/v1/tokens', { name: 'two', scope: 'read', expiresInDays: 30 });
   assert.equal(second.statusCode, 400);
   assert.equal(second.json().error, 'too_many_tokens');
   assert.match(second.json().message, /You have a token, the most this server allows/);
+});
+
+test('the app itself has no request limit', async () => {
+  for (let i = 0; i < 700; i++) assert.equal((await asUser('GET', '/api/v1/workouts')).statusCode, 200);
 });

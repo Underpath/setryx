@@ -1,6 +1,6 @@
-import type { FastifyPluginAsync, FastifyRequest } from 'fastify';
+import type { FastifyPluginAsync } from 'fastify';
 import { changePasswordRequestSchema, updateMeRequestSchema } from '@setryx/shared';
-import { requireUser } from '../app.ts';
+import { checkPasswordAttempts, recordWrongPassword, requireUser } from '../app.ts';
 import { HttpError, parse } from '../http.ts';
 import { verifyPassword } from '../passwords.ts';
 import { deleteUserSessions } from '../sessions.ts';
@@ -19,10 +19,12 @@ export const meRoutes: FastifyPluginAsync = async (app) => {
     return { user: toPublic(updated) };
   });
 
-  app.post('/me/password', { config: { rateLimit: { max: (r: FastifyRequest) => r.server.limits.get().signInPerMinute, timeWindow: '1 minute' } } }, async (req, reply) => {
+  app.post('/me/password', async (req, reply) => {
     const user = requireUser(req);
     const body = parse(changePasswordRequestSchema, req.body);
+    checkPasswordAttempts(req, reply, user.id); // shares the account's sign-in count
     if (!(await verifyPassword(body.currentPassword, user.passwordHash))) {
+      recordWrongPassword(req, user.id);
       throw new HttpError(400, 'invalid_input', 'Your current password is wrong.', { currentPassword: 'This password is wrong.' });
     }
     await setPassword(db, user.id, body.newPassword);

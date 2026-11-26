@@ -114,16 +114,15 @@ curl -H "Authorization: Bearer setryx_…" http://<your-server>:38471/api/v1/wor
 
 ### Limits
 
-An admin sets these under **Settings → Limits**. They take effect straight away.
+An admin sets these under **Settings → Limits**. They take effect straight away. The app itself isn't limited.
 
 | Limit | Default | Applies to |
 |---|---|---|
+| Wrong passwords a minute for each account | 10 | signing in and changing a password, counted per account rather than per address, so a proxy doesn't affect it |
 | Requests a minute for each token | 120 | the API and MCP together; can be turned off |
-| Requests a minute for each person in the app | 600 | everything the app asks for apart from exercise photos; can be turned off |
-| Sign-in attempts a minute from one address | 10 | signing in, signing up and changing a password |
 | Tokens each person can have | 5 | lowering it keeps existing tokens |
 
-A short burst up to the limit is fine. Going over it gets HTTP 429 with a `Retry-After` header, and API responses carry `RateLimit-Limit` and `RateLimit-Remaining`. Counts are kept in memory, so a restart resets them.
+A short burst up to a limit is fine. Going over it gets HTTP 429 with a `Retry-After` header, and API responses carry `RateLimit-Limit` and `RateLimit-Remaining`. Once an account reaches its wrong-password limit, signing in to it waits a few seconds between tries, even with the right password. Counts are kept in memory, so a restart resets them.
 
 ### AI agents (MCP)
 

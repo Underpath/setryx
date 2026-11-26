@@ -1,7 +1,6 @@
 import { randomBytes } from 'node:crypto';
 import Fastify, { type FastifyInstance, type FastifyReply, type FastifyRequest } from 'fastify';
 import cookie from '@fastify/cookie';
-import rateLimit from '@fastify/rate-limit';
 import fastifyStatic from '@fastify/static';
 import type { Config } from './config.ts';
 import type { DB } from './db.ts';
@@ -59,12 +58,10 @@ export async function buildApp(config: Config, db: DB, opts: { logger?: boolean 
   app.decorateRequest('apiToken', null);
 
   await app.register(cookie, { secret: config.sessionSecret });
-  await app.register(rateLimit, { global: false });
 
   app.setErrorHandler((err, req, reply) => {
     if (err instanceof HttpError) return sendError(reply, err);
     const status = (err as { statusCode?: number }).statusCode;
-    if (status === 429) return sendError(reply, new HttpError(429, 'rate_limited', 'Too many attempts. Wait a minute and try again.'));
     if (status && status >= 400 && status < 500) return sendError(reply, new HttpError(status, 'bad_request', err instanceof Error ? err.message : 'Bad request.'));
     req.log.error(err);
     return sendError(reply, new HttpError(500, 'server_error', 'Something went wrong on the server. Check the container logs.'));
@@ -110,8 +107,6 @@ export async function buildApp(config: Config, db: DB, opts: { logger?: boolean 
     req.user = user;
     req.sessionToken = unsigned.value;
     if (session.renewedUntil) setSessionCookie(req, reply, unsigned.value, session.renewedUntil);
-    // Exercise photos come in dozens per page and are cheap, so they aren't counted.
-    if (!req.url.startsWith('/api/v1/exercise-images/')) limitRequest(req, reply, `user:${user.id}`, app.limits.get().appPerMinute, 1, 'You');
   });
 
   // Polled by the Docker health check every 30 s; keep it out of the logs.
@@ -197,6 +192,24 @@ export function limitRequest(req: FastifyRequest, reply: FastifyReply, key: stri
   reply.header('RateLimit-Remaining', 0).header('Retry-After', taken.retryAfterS);
   const wait = taken.retryAfterS === 1 ? 'a second' : `${taken.retryAfterS} seconds`;
   throw new HttpError(429, 'rate_limited', `${who} made more than ${perMinute} requests a minute, the limit on this server. Wait ${wait} and try again.`);
+}
+
+/**
+ * Wrong passwords are limited per account, not per address: behind a proxy
+ * addresses can be shared or faked, but the account being guessed at can't.
+ * Call before checking a password; it refuses while the account is over the limit.
+ */
+export function checkPasswordAttempts(req: FastifyRequest, reply: FastifyReply, account: string): void {
+  const taken = req.server.rateLimiter.peek(`password:${account}`, req.server.limits.get().signInPerMinute);
+  if (taken.ok) return;
+  reply.header('Retry-After', taken.retryAfterS);
+  const wait = taken.retryAfterS === 1 ? 'a second' : `${taken.retryAfterS} seconds`;
+  throw new HttpError(429, 'rate_limited', `Too many wrong passwords for this account. Wait ${wait} and try again.`);
+}
+
+/** Counts a wrong password against the account. */
+export function recordWrongPassword(req: FastifyRequest, account: string): void {
+  req.server.rateLimiter.take(`password:${account}`, req.server.limits.get().signInPerMinute);
 }
 
 export function requireUser(req: FastifyRequest): UserRecord {

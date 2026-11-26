@@ -11,7 +11,6 @@
   },
   "dependencies": {
     "@fastify/cookie": "^11.0.0",
-    "@fastify/rate-limit": "^11.0.0",
     "@fastify/static": "^10.0.0",
     "@setryx/shared": "*",
     "fastify": "^5.6.0",

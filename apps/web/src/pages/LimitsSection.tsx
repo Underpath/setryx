@@ -13,12 +13,10 @@ const FIELDS: { key: keyof LimitSettings; label: string; hint: string; optional?
     optional: true,
   },
   {
-    key: 'appPerMinute',
-    label: 'Requests a minute for each person in the app',
-    hint: 'Everything the app asks the server for, apart from exercise photos. The default of 600 leaves plenty of room. Leave empty for no limit.',
-    optional: true,
+    key: 'signInPerMinute',
+    label: 'Wrong passwords a minute for each account',
+    hint: 'Counted per account, whoever is trying, when signing in or changing a password. Past it, that account waits a few seconds between tries, even with the right password.',
   },
-  { key: 'signInPerMinute', label: 'Sign-in attempts a minute from one address', hint: 'Signing in, signing up and changing a password. Slows down password guessing.' },
   { key: 'maxTokensPerUser', label: 'Tokens each person can have', hint: 'Lowering it doesn’t remove tokens people already have; they just can’t add more.' },
 ];
 
@@ -27,7 +25,7 @@ const toDraft = (s: LimitSettings): Draft =>
 const fromDraft = (d: Draft): LimitSettings =>
   Object.fromEntries(FIELDS.map(({ key, optional }) => [key, d[key].trim() === '' && optional ? null : Number(d[key])])) as LimitSettings;
 
-/** Admin: how many requests tokens and people may make, sign-in attempts, and tokens per person. */
+/** Admin: wrong passwords per account, requests per token, and tokens per person. */
 export function LimitsSection() {
   const qc = useQueryClient();
   const toast = useToast();
@@ -55,8 +53,8 @@ export function LimitsSection() {
   return (
     <>
       <p className="muted small" style={{ maxWidth: '62ch', marginBottom: 12 }}>
-        Limits stop one person, script or agent from slowing the server down for everyone. A burst up to the limit is fine; going over it gets a short wait,
-        and the app and agents are told how long. Changes apply straight away.
+        Limits slow down password guessing and stop a script or agent from slowing the server down for everyone. The app itself isn’t limited. A burst up to
+        a limit is fine; going over it gets a short wait, and you’re told how long. Changes apply straight away.
       </p>
       <form className="form" onSubmit={submit} noValidate>
         {FIELDS.map(({ key, label, hint, optional }) => (

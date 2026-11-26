@@ -142,19 +142,17 @@ export type BackupFile = { name: string; kind: 'latest' | 'before-update' | 'man
 const wholeNumber = (min: number, max: number) =>
   z.number({ error: 'Enter a number.' }).int('Use a whole number.').min(min, `Use at least ${min}.`).max(max, `Use at most ${max}.`);
 
-/** Admin-set limits. Request limits are per minute; null means no limit. */
+/** Admin-set limits for sign-in, the API and MCP. Per minute; null means no limit. */
 export const limitSettingsSchema = z.object({
   /** Requests each API token may make, over the REST API and MCP together. */
   tokenPerMinute: wholeNumber(10, 10000).nullable(),
-  /** Requests each signed-in person may make from the app (photos aren't counted). */
-  appPerMinute: wholeNumber(60, 10000).nullable(),
-  /** Sign-in, sign-up and password attempts from one IP address. */
+  /** Wrong passwords each account may get, signing in or changing the password. */
   signInPerMinute: wholeNumber(3, 100),
   /** Tokens each person may have at once. */
   maxTokensPerUser: wholeNumber(1, 100),
 });
 export type LimitSettings = z.infer<typeof limitSettingsSchema>;
-export const defaultLimitSettings: LimitSettings = { tokenPerMinute: 120, appPerMinute: 600, signInPerMinute: 10, maxTokensPerUser: 5 };
+export const defaultLimitSettings: LimitSettings = { tokenPerMinute: 120, signInPerMinute: 10, maxTokensPerUser: 5 };
 
 // ── API tokens ────────────────────────────────────────────
 

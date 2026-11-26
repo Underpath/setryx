@@ -45,16 +45,29 @@ export class RateLimiter {
   private calls = 0;
 
   take(key: string, perMinute: number, cost = 1, now = Date.now()): Taken {
-    const rate = perMinute / 60_000; // per millisecond
-    const b = this.buckets.get(key);
-    const left = b ? Math.min(perMinute, b.left + (now - b.at) * rate) : perMinute;
+    const left = this.left(key, perMinute, now);
     if (++this.calls % 1000 === 0) this.sweep(now);
     if (left < cost) {
       this.buckets.set(key, { left, at: now });
-      return { ok: false, retryAfterS: Math.max(1, Math.ceil((cost - left) / rate / 1000)) };
+      return this.refused(left, perMinute, cost);
     }
     this.buckets.set(key, { left: left - cost, at: now });
     return { ok: true, remaining: Math.floor(left - cost) };
+  }
+
+  /** Whether `cost` could be taken now, without taking it. */
+  peek(key: string, perMinute: number, cost = 1, now = Date.now()): Taken {
+    const left = this.left(key, perMinute, now);
+    return left < cost ? this.refused(left, perMinute, cost) : { ok: true, remaining: Math.floor(left - cost) };
+  }
+
+  private left(key: string, perMinute: number, now: number): number {
+    const b = this.buckets.get(key);
+    return b ? Math.min(perMinute, b.left + ((now - b.at) * perMinute) / 60_000) : perMinute;
+  }
+
+  private refused(left: number, perMinute: number, cost: number): Taken {
+    return { ok: false, retryAfterS: Math.max(1, Math.ceil(((cost - left) * 60) / perMinute)) };
   }
 
   /** Forget buckets idle long enough to be full again. */

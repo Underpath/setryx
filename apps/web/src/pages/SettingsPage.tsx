@@ -19,7 +19,7 @@ const SECTIONS: { id: SectionId; label: string; hint: string; admin?: boolean }[
   { id: 'api', label: 'API and AI agents', hint: 'Tokens, MCP' },
   { id: 'people', label: 'People and invites', hint: 'Accounts on this server', admin: true },
   { id: 'photos', label: 'Exercise photos', hint: 'Allow, download or remove', admin: true },
-  { id: 'limits', label: 'Limits', hint: 'Requests, sign-in attempts, tokens', admin: true },
+  { id: 'limits', label: 'Limits', hint: 'Sign-in attempts, API and MCP', admin: true },
   { id: 'backups', label: 'Backups', hint: 'Database copies for your volume backups', admin: true },
 ];
 const WIDE = '(min-width: 760px)';
