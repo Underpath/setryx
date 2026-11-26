@@ -72,6 +72,9 @@ export function Switch({ label, hint, checked, onChange }: { label: string; hint
 export function Sheet({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
   const ref = useRef<HTMLDivElement>(null);
   const titleId = useId();
+  // Callers often pass a new onClose on every render; keep the latest without re-running effects.
+  const closeRef = useRef(onClose);
+  closeRef.current = onClose;
   // Phone back gesture / browser back closes the sheet instead of leaving the page.
   useBackHandler(
     true,
@@ -91,13 +94,14 @@ export function Sheet({ title, onClose, children }: { title: string; onClose: ()
       body?.querySelector<HTMLElement>(':scope > button, :scope > :not(.sheet-head) button');
     // Without scrolling: a long sheet should still open at the top.
     target?.focus({ preventScroll: true });
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && closeRef.current();
     document.addEventListener('keydown', onKey);
     return () => {
       document.removeEventListener('keydown', onKey);
       prev?.focus();
     };
-  }, [onClose]);
+    // Once, when the sheet opens: re-focusing on every render would steal focus while typing.
+  }, []);
   return (
     <div className="sheet-backdrop" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
       <div className="sheet" role="dialog" aria-modal="true" aria-labelledby={titleId} ref={ref}>

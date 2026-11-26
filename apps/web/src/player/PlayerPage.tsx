@@ -1,4 +1,4 @@
-import { type CSSProperties, useEffect, useMemo, useState } from 'react';
+import { type CSSProperties, useEffect, useRef, useMemo, useState } from 'react';
 import { Link, Navigate, useNavigate, useParams, useSearchParams } from 'react-router';
 import {
   type FlatStep,
@@ -128,6 +128,7 @@ function Player({ user, initial }: { user: PublicUser; initial: PlayerState }) {
   const toast = useToast();
   const wide = useMediaQuery('(min-width: 1000px) and (orientation: landscape)');
   const [sheet, setSheet] = useState<'cues' | 'end' | null>(null);
+  const pausedForInfo = useRef(false);
   const navigate = useNavigate();
   const { workoutId } = useParams();
 
@@ -260,6 +261,23 @@ function Player({ user, initial }: { user: PublicUser; initial: PlayerState }) {
     </div>
   );
 
+  // Reading the details mid-set shouldn't eat the clock: a running timed exercise pauses,
+  // and resumes (with the 3-2-1 countdown) when the sheet closes.
+  const openInfo = () => {
+    if (timed && step.kind === 'exercise' && !state.paused && p.countdown === null) {
+      pausedForInfo.current = true;
+      p.togglePause();
+    }
+    setSheet('cues');
+  };
+  const closeInfo = () => {
+    setSheet(null);
+    if (pausedForInfo.current) {
+      pausedForInfo.current = false;
+      p.togglePause();
+    }
+  };
+
   const topBar = (
     <div className="p-top">
       <button className="icon-btn" type="button" aria-label="End workout" onClick={() => setSheet('end')}><Icon name="close" /></button>
@@ -276,7 +294,7 @@ function Player({ user, initial }: { user: PublicUser; initial: PlayerState }) {
         )}
       </div>
       {step.kind === 'exercise' && (
-        <button className="icon-btn" type="button" aria-label="Exercise details" onClick={() => setSheet('cues')}>
+        <button className="icon-btn" type="button" aria-label="Exercise details" onClick={openInfo}>
           <svg className="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" /><path d="M12 11v6M12 7.5v.5" /></svg>
         </button>
       )}
@@ -359,7 +377,8 @@ function Player({ user, initial }: { user: PublicUser; initial: PlayerState }) {
       )}
 
       {sheet === 'cues' && step.kind === 'exercise' && (
-        <Sheet title={ex(step)?.name ?? 'Exercise'} onClose={() => setSheet(null)}>
+        <Sheet title={ex(step)?.name ?? 'Exercise'} onClose={closeInfo}>
+          {pausedForInfo.current && <p className="small muted">Paused while you read. It resumes with a countdown when you close this.</p>}
           <CuesBlock step={step} exercise={ex(step)} />
         </Sheet>
       )}
