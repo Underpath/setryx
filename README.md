@@ -121,7 +121,7 @@ An admin sets these under **Settings → Limits**. They take effect straight awa
 | Requests a minute for each token | 120 | the API and MCP together; can be turned off |
 | Requests a minute for each person in the app | 600 | everything the app asks for apart from exercise photos; can be turned off |
 | Sign-in attempts a minute from one address | 10 | signing in, signing up and changing a password |
-| Tokens each person can have | 20 | lowering it keeps existing tokens |
+| Tokens each person can have | 5 | lowering it keeps existing tokens |
 
 A short burst up to the limit is fine. Going over it gets HTTP 429 with a `Retry-After` header, and API responses carry `RateLimit-Limit` and `RateLimit-Remaining`. Counts are kept in memory, so a restart resets them.
 

@@ -154,7 +154,7 @@ export const limitSettingsSchema = z.object({
   maxTokensPerUser: wholeNumber(1, 100),
 });
 export type LimitSettings = z.infer<typeof limitSettingsSchema>;
-export const defaultLimitSettings: LimitSettings = { tokenPerMinute: 120, appPerMinute: 600, signInPerMinute: 10, maxTokensPerUser: 20 };
+export const defaultLimitSettings: LimitSettings = { tokenPerMinute: 120, appPerMinute: 600, signInPerMinute: 10, maxTokensPerUser: 5 };
 
 // ── API tokens ────────────────────────────────────────────
 
