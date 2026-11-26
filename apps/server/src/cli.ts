@@ -7,6 +7,7 @@ import { loadConfig } from './config.ts';
 import { openDb } from './db.ts';
 import { deleteUserApiTokens } from './api-tokens.ts';
 import { deleteUserSessions } from './sessions.ts';
+import { forgetDevices } from './devices.ts';
 import { findUserByUsername, listUsers, setPassword, updateUser } from './users.ts';
 
 const [command, username] = process.argv.slice(2);
@@ -48,6 +49,7 @@ async function main(): Promise<number> {
       await setPassword(db, user.id, password);
       if (user.disabled) updateUser(db, user.id, { disabled: false });
       deleteUserSessions(db, user.id);
+      forgetDevices(db, user.id);
       deleteUserApiTokens(db, user.id);
       console.log(`Password changed for ${user.username}. They're signed out everywhere, their API tokens are revoked, and they can sign in with the new password.`);
       return 0;

@@ -13,7 +13,7 @@ const GROUPS: { title: string; fields: FieldDef[] }[] = [
       {
         key: 'signInPerMinute',
         label: 'Wrong passwords a minute for each account',
-        hint: 'Counted per account, whoever is trying, when signing in, changing a password or making a token. Past it, that account waits a few seconds between tries, even with the right password.',
+        hint: 'Counted per account, whoever is trying. Past it, signing in waits a few seconds between tries, even with the right password, except on devices that have signed in to that account before: each of those has its own count. Changing a password or making a token counts per signed-in session.',
       },
       { key: 'sessionIdleDays', label: 'Days a sign-in lasts without use', hint: 'Someone who doesn’t open setryx for this long is signed out on that device.' },
       {

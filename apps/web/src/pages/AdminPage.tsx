@@ -1,12 +1,38 @@
 import { type FormEvent, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { AdminUpdateUserRequest, AppSettings, Invite, PublicUser } from '@setryx/shared';
+import type { AdminUpdateUserRequest, AppSettings, Invite, PublicUser, SignInAlert } from '@setryx/shared';
+import { Link } from 'react-router';
+import { ago } from '../util.ts';
 import { api } from '../api.ts';
 import { useSetMe } from '../session.ts';
 import { Field, FormError, Icon, Sheet, Switch, fieldErrors, useToast } from '../components/ui.tsx';
 
 const dateFmt = new Intl.DateTimeFormat(undefined, { day: 'numeric', month: 'short' });
 const formData = (e: FormEvent<HTMLFormElement>) => (e.preventDefault(), Object.fromEntries(new FormData(e.currentTarget)) as Record<string, string>);
+
+// ── Password guessing ──
+/** Admins: accounts somebody keeps guessing passwords for. Checks every minute. */
+export function SignInAlerts({ linkToPeople = false }: { linkToPeople?: boolean }) {
+  const alerts = useQuery({
+    queryKey: ['admin', 'sign-in-alerts'],
+    queryFn: () => api.get<{ alerts: SignInAlert[] }>('/admin/sign-in-alerts'),
+    refetchInterval: 60_000,
+  });
+  return (
+    <>
+      {alerts.data?.alerts.map((a) => (
+        <div className="notice" role="status" key={a.userId}>
+          <p>
+            <strong>Someone is guessing the password for {a.displayName} ({a.username})</strong>
+            It started {ago(a.since)}; {a.refused === 1 ? 'one try has' : `${a.refused} tries have`} been turned away. Devices that have signed in to this
+            account before can still sign in; a new device has to wait until the guessing stops. A strong password keeps the account safe meanwhile.
+          </p>
+          {linkToPeople && <Link className="btn" to="/settings/people">See people</Link>}
+        </div>
+      ))}
+    </>
+  );
+}
 
 // ── People ──
 export function UsersSection({ me }: { me: PublicUser }) {
@@ -15,6 +41,7 @@ export function UsersSection({ me }: { me: PublicUser }) {
   const [editing, setEditing] = useState<PublicUser | null>(null);
   return (
     <section className="section">
+      <SignInAlerts />
       <div className="section-head">
         <h2 className="h3">People</h2>
         <button className="btn btn-quiet btn-sm" type="button" onClick={() => setAdding(true)}>Add person</button>

@@ -1,6 +1,7 @@
 import type { FastifyPluginAsync } from 'fastify';
 import { changePasswordRequestSchema, updateMeRequestSchema } from '@setryx/shared';
-import { clearSessionCookie, requireUser, reservePasswordAttempt } from '../app.ts';
+import { clearSessionCookie, deviceIdOf, requireUser, reservePasswordAttempt, sessionBucket } from '../app.ts';
+import { forgetDevices } from '../devices.ts';
 import { HttpError, parse } from '../http.ts';
 import { verifyPassword } from '../passwords.ts';
 import { deleteSession, deleteUserSessionById, deleteUserSessions, listUserSessions } from '../sessions.ts';
@@ -23,14 +24,15 @@ export const meRoutes: FastifyPluginAsync = async (app) => {
   app.post('/me/password', async (req, reply) => {
     const user = requireUser(req);
     const body = parse(changePasswordRequestSchema, req.body);
-    const refund = reservePasswordAttempt(req, reply, user.id); // shares the account's sign-in count
+    const refund = reservePasswordAttempt(req, reply, sessionBucket(req));
     if (!(await verifyPassword(body.currentPassword, user.passwordHash))) {
       throw new HttpError(400, 'invalid_input', 'Your current password is wrong.', { currentPassword: 'This password is wrong.' });
     }
     refund();
     await setPassword(db, user.id, body.newPassword);
-    // Sign out everywhere else; keep this device signed in.
+    // Sign out everywhere else and forget the other devices; keep this one.
     deleteUserSessions(db, user.id, req.sessionToken ?? undefined);
+    forgetDevices(db, user.id, deviceIdOf(req));
     if (body.revokeTokens) deleteUserApiTokens(db, user.id);
     return reply.status(204).send();
   });
@@ -41,6 +43,7 @@ export const meRoutes: FastifyPluginAsync = async (app) => {
   /** Signs out everywhere except this device. */
   app.delete('/me/sessions', async (req, reply) => {
     deleteUserSessions(db, requireUser(req).id, req.sessionToken ?? undefined);
+    forgetDevices(db, requireUser(req).id, deviceIdOf(req));
     return reply.status(204).send();
   });
 

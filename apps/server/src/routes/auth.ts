@@ -1,6 +1,7 @@
 import type { FastifyPluginAsync } from 'fastify';
 import { loginRequestSchema, registerRequestSchema, setupRequestSchema } from '@setryx/shared';
-import { clearSessionCookie, requireUser, reservePasswordAttempt, setSessionCookie } from '../app.ts';
+import { clearSessionCookie, deviceIdOf, rememberThisDevice, requireUser, reservePasswordAttempt, setSessionCookie } from '../app.ts';
+import { knownDevice } from '../devices.ts';
 import { tx } from '../db.ts';
 import { HttpError, parse } from '../http.ts';
 import { findOpenInvite, markInviteUsed } from '../invites.ts';
@@ -27,6 +28,7 @@ export const authRoutes: FastifyPluginAsync = async (app) => {
     });
     const s = createSession(db, user.id, req.headers['user-agent'], app.limits.get());
     setSessionCookie(req, reply, s.token, s.expiresAt);
+    rememberThisDevice(req, reply, user.id);
     return reply.status(201).send({ user: toPublic(user) });
   });
 
@@ -36,7 +38,11 @@ export const authRoutes: FastifyPluginAsync = async (app) => {
     const user = findUserByUsername(db, body.username);
     // Unknown names are counted too, so a refusal doesn't reveal which accounts exist.
     const account = user ? user.id : `name:${body.username.trim().toLowerCase()}`;
-    const refund = reservePasswordAttempt(req, reply, account);
+    // A browser that has signed in to this account before has its own count, so
+    // strangers using up the account's shared one can't lock its owner out.
+    const deviceId = user ? deviceIdOf(req) : null;
+    const known = user && deviceId ? knownDevice(db, deviceId, user.id) : null;
+    const refund = known ? reservePasswordAttempt(req, reply, `${user!.id}:device:${known}`) : reservePasswordAttempt(req, reply, account, user?.id);
     const ok = user ? await verifyPassword(body.password, user.passwordHash) : await dummyVerify(body.password);
     // The password is always checked, and a turned-off account gets the same
     // answer as a wrong password, so neither timing nor wording tells them apart.
@@ -46,6 +52,7 @@ export const authRoutes: FastifyPluginAsync = async (app) => {
     if (req.sessionToken) deleteSession(db, req.sessionToken);
     const s = createSession(db, user.id, req.headers['user-agent'], app.limits.get());
     setSessionCookie(req, reply, s.token, s.expiresAt);
+    rememberThisDevice(req, reply, user.id);
     return { user: toPublic(user) };
   });
 
@@ -84,6 +91,7 @@ export const authRoutes: FastifyPluginAsync = async (app) => {
     });
     const s = createSession(db, user.id, req.headers['user-agent'], app.limits.get());
     setSessionCookie(req, reply, s.token, s.expiresAt);
+    rememberThisDevice(req, reply, user.id);
     return reply.status(201).send({ user: toPublic(user) });
   });
 };

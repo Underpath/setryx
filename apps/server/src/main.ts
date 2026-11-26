@@ -2,15 +2,17 @@ import { buildApp } from './app.ts';
 import { loadConfig } from './config.ts';
 import { openDb } from './db.ts';
 import { purgeExpiredSessions } from './sessions.ts';
+import { purgeOldDevices } from './devices.ts';
 
 const config = loadConfig();
 const db = openDb(config.dataDir);
 const app = await buildApp(config, db, { logger: true });
 
 purgeExpiredSessions(db);
+purgeOldDevices(db);
 // setryx-latest.db: a complete copy for volume backups, refreshed when something changed.
 app.backups.start();
-const purgeTimer = setInterval(() => purgeExpiredSessions(db), 6 * 3_600_000);
+const purgeTimer = setInterval(() => (purgeExpiredSessions(db), purgeOldDevices(db)), 6 * 3_600_000);
 purgeTimer.unref();
 
 if (!config.allowedHosts) {

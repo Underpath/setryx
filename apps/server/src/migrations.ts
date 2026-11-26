@@ -188,4 +188,18 @@ export const migrations: { version: number; sql: string }[] = [
       CREATE UNIQUE INDEX auth_sessions_id ON auth_sessions(id);
     `,
   },
+  {
+    version: 7,
+    sql: `
+      -- Browsers that have signed in to an account before (see devices.ts).
+      CREATE TABLE known_devices (
+        id_hash       TEXT NOT NULL,
+        user_id       TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        created_at    TEXT NOT NULL,
+        last_used_at  TEXT NOT NULL,
+        PRIMARY KEY (id_hash, user_id)
+      );
+      CREATE INDEX known_devices_user ON known_devices(user_id, last_used_at);
+    `,
+  },
 ];

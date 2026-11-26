@@ -99,7 +99,7 @@ test('an MCP call counts once, however many API calls its tool makes, and batche
   assert.match(over.json().error.message, /more than 10 requests a minute/);
 });
 
-test('wrong passwords are counted per account, from any address, and include password changes', async () => {
+test('wrong passwords are counted per account, from any address, apart from password changes', async () => {
   await setLimits({ signInPerMinute: 3 });
   await asUser('POST', '/api/v1/admin/users', { username: 'pat', displayName: 'Pat', password: 'pat password 12', role: 'user' });
   const login = (username: string, password: string, ip = '10.0.0.1') =>
@@ -110,8 +110,9 @@ test('wrong passwords are counted per account, from any address, and include pas
   assert.equal(over.statusCode, 429);
   assert.match(over.json().message, /Too many wrong passwords for this account/);
   assert.ok(Number(over.headers['retry-after']) >= 1);
+  // Signed in, you can still change your password: that counts per session.
   const change = await asUser('POST', '/api/v1/me/password', { currentPassword: 'owner password 1', newPassword: 'another password 1' });
-  assert.equal(change.statusCode, 429);
+  assert.equal(change.statusCode, 204);
 
   // Other accounts, and right passwords, aren't affected.
   for (let i = 0; i < 5; i++) assert.equal((await login('pat', 'pat password 12')).statusCode, 200);
@@ -120,13 +121,13 @@ test('wrong passwords are counted per account, from any address, and include pas
   assert.equal((await login('nobody', 'wrong password 1')).statusCode, 429);
 });
 
-test('wrong current passwords count against the account’s sign-in limit', async () => {
+test('wrong current passwords are limited per session, apart from sign-in', async () => {
   await setLimits({ signInPerMinute: 3 });
-  for (let i = 0; i < 3; i++) {
-    assert.equal((await asUser('POST', '/api/v1/me/password', { currentPassword: 'wrong password 1', newPassword: 'another password 1' })).statusCode, 400);
-  }
+  const change = () => asUser('POST', '/api/v1/me/password', { currentPassword: 'wrong password 1', newPassword: 'another password 1' });
+  for (let i = 0; i < 3; i++) assert.equal((await change()).statusCode, 400);
+  assert.equal((await change()).statusCode, 429);
   const login = await app.inject({ method: 'POST', url: '/api/v1/auth/login', payload: { username: 'owner', password: 'owner password 1' } });
-  assert.equal(login.statusCode, 429);
+  assert.equal(login.statusCode, 200);
 });
 
 test('token count is capped', async () => {

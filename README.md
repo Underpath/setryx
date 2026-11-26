@@ -125,7 +125,7 @@ An admin sets these under **Settings → Limits**. They take effect straight awa
 
 | Limit | Default | Applies to |
 |---|---|---|
-| Wrong passwords a minute for each account | 10 | signing in, changing a password and creating a token. Counted per account rather than per address, so a proxy doesn't affect it |
+| Wrong passwords a minute for each account | 10 | counted per account rather than per address, so a proxy doesn't affect it. Each device that has signed in to the account before gets its own count. Changing a password or creating a token counts per signed-in session |
 | Days a sign-in lasts without use | 30 | after that, that device is signed out |
 | Days a sign-in lasts at most | 90 | everyone signs in again this long after signing in; can be turned off |
 | Devices each person can be signed in on | 5 | signing in on one more signs out the device used longest ago |
@@ -133,7 +133,11 @@ An admin sets these under **Settings → Limits**. They take effect straight awa
 | Tokens each person can have | 5 | lowering it keeps existing tokens |
 | Storage for each person | 100 MB | workouts, routines, own exercises and sessions; can be turned off |
 
-A short burst up to a limit is fine. Going over a rate limit gets HTTP 429 with a `Retry-After` header, and API responses carry `RateLimit-Limit` and `RateLimit-Remaining`. Once an account reaches its wrong-password limit, signing in to it waits a few seconds between tries, even with the right password. A full storage allowance answers 507; deleting still works, and a session logged offline stays on the phone until there's room. Counts are kept in memory, so a restart resets them.
+A short burst up to a limit is fine. Going over a rate limit gets HTTP 429 with a `Retry-After` header, and API responses carry `RateLimit-Limit` and `RateLimit-Remaining`. Once an account reaches its wrong-password limit, signing in to it waits a few seconds between tries, even with the right password.
+
+**Known devices.** Someone guessing an account's password could otherwise keep its owner locked out. To prevent that, a browser that signs in with the password keeps a device cookie (`setryx_device`, signed, HttpOnly, for a year, and kept when you sign out). Sign-ins from a known device are counted on their own, so guessing from elsewhere doesn't lock it out. A device that has never signed in to that account waits until the guessing stops. Changing your password, **Sign out everywhere else**, an admin password reset, `reset-password` and turning the account off all forget the account's other devices. While an account's shared count is used up, the server logs a warning and admins see a notice on Today and under **People and invites**.
+
+A full storage allowance answers 507; deleting still works, and a session logged offline stays on the phone until there's room. Counts are kept in memory, so a restart resets them (`docker restart setryx` clears a lockout, though guessing that carries on fills the count again).
 
 Everyone can see where they're signed in under **Settings → Account** and sign out any device.
 

@@ -80,3 +80,42 @@ export class RateLimiter {
     for (const [key, b] of this.buckets) if (now - b.at > 60_000) this.buckets.delete(key);
   }
 }
+
+/** How long after the last refusal an account still counts as under attack. */
+const WATCH_MS = 15 * 60_000;
+
+/**
+ * Accounts whose shared wrong-password count ran out, i.e. somebody without a
+ * known device kept guessing. Shown to admins and logged, at most every 10 minutes per account.
+ */
+export class LockoutWatch {
+  private seen = new Map<string, { since: number; lastAt: number; refused: number; loggedAt: number }>();
+
+  /** Records a refusal; true when it's worth a log line. */
+  refused(userId: string, now = Date.now()): boolean {
+    const s = this.seen.get(userId);
+    if (!s || now - s.lastAt > WATCH_MS) {
+      this.seen.set(userId, { since: now, lastAt: now, refused: 1, loggedAt: now });
+      return true;
+    }
+    s.lastAt = now;
+    s.refused++;
+    if (now - s.loggedAt < 10 * 60_000) return false;
+    s.loggedAt = now;
+    return true;
+  }
+
+  count(userId: string): number {
+    return this.seen.get(userId)?.refused ?? 0;
+  }
+
+  /** Accounts refused within the last 15 minutes. */
+  active(now = Date.now()): { userId: string; since: number; lastAt: number; refused: number }[] {
+    const out = [];
+    for (const [userId, s] of this.seen) {
+      if (now - s.lastAt > WATCH_MS) this.seen.delete(userId);
+      else out.push({ userId, since: s.since, lastAt: s.lastAt, refused: s.refused });
+    }
+    return out;
+  }
+}

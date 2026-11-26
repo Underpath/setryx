@@ -168,6 +168,8 @@ export const defaultLimitSettings: LimitSettings = { tokenPerMinute: 120, signIn
 
 /** One place someone is signed in, as listed in their account settings. */
 export type SignInSession = { id: string; userAgent: string | null; createdAt: string; lastUsedAt: string; current: boolean };
+/** An account whose shared wrong-password count ran out recently: someone without a known device kept guessing. */
+export type SignInAlert = { userId: string; username: string; displayName: string; since: string; lastAt: string; refused: number };
 
 // ── API tokens ────────────────────────────────────────────
 

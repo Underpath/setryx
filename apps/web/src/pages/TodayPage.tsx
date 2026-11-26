@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router';
 import { type PlayerState, type PublicUser, stepsOf } from '@setryx/shared';
 import { TopBar } from '../components/Shell.tsx';
+import { SignInAlerts } from './AdminPage.tsx';
 import { formatMinutes, useRestartRoutine, useWorkouts } from '../data.ts';
 import { UpNextCard, useRoutineStatuses } from '../components/routines.tsx';
 import { SESSION_EVENT, loadActive } from '../player/storage.ts';
@@ -129,6 +130,7 @@ export function TodayPage({ user }: { user: PublicUser }) {
     <>
       <TopBar title="Today" user={user} />
       <HttpsNotice />
+      {user.role === 'admin' && <SignInAlerts linkToPeople />}
       {active && <ResumeBanner session={active} />}
       <OutboxBanner userId={user.id} />
       <UpNext user={user} />

@@ -7,9 +7,11 @@ import {
   backupSettingsSchema,
   createInviteRequestSchema,
   limitSettingsSchema,
+  type SignInAlert,
 } from '@setryx/shared';
 import { z } from 'zod';
-import { requireAdmin } from '../app.ts';
+import { deviceIdOf, requireAdmin } from '../app.ts';
+import { forgetDevices } from '../devices.ts';
 import { listBackups } from '../backup.ts';
 import { imagesAllowed, imagesStatus, removeAllImages, setImagesAllowed, startDownloadAll } from '../exercise-images.ts';
 import { tx } from '../db.ts';
@@ -75,6 +77,7 @@ export const adminRoutes: FastifyPluginAsync = async (app) => {
       // so turning it back on doesn't quietly bring old tokens back.
       if (body.disabled) {
         deleteUserSessions(db, target.id);
+        forgetDevices(db, target.id);
         deleteUserApiTokens(db, target.id);
       }
       return updated;
@@ -89,6 +92,7 @@ export const adminRoutes: FastifyPluginAsync = async (app) => {
     await setPassword(db, target.id, body.password);
     // Their old sessions stop working; resetting your own keeps this device signed in.
     deleteUserSessions(db, target.id, target.id === req.user!.id ? req.sessionToken ?? undefined : undefined);
+    forgetDevices(db, target.id, target.id === req.user!.id ? deviceIdOf(req) : null);
     // An admin reset is for a lost or compromised account, so API tokens go too.
     deleteUserApiTokens(db, target.id);
     return reply.status(204).send();
@@ -167,6 +171,14 @@ export const adminRoutes: FastifyPluginAsync = async (app) => {
   // Request and token limits (see limits.ts).
   app.get('/limits', async () => app.limits.get());
   app.put('/limits', async (req) => app.limits.set(parse(limitSettingsSchema, req.body)));
+
+  /** Accounts whose shared wrong-password count ran out in the last 15 minutes. */
+  app.get('/sign-in-alerts', async (): Promise<{ alerts: SignInAlert[] }> => ({
+    alerts: app.lockouts.active().flatMap((a) => {
+      const u = findUserById(db, a.userId);
+      return u ? [{ userId: u.id, username: u.username, displayName: u.displayName, since: new Date(a.since).toISOString(), lastAt: new Date(a.lastAt).toISOString(), refused: a.refused }] : [];
+    }),
+  }));
 
   app.get('/settings', async () => ({ openSignup: getOpenSignup(db) }));
 

@@ -87,7 +87,7 @@ test('changing your password revokes your tokens unless you untick it', async ()
   assert.equal((await bearer(keep)).statusCode, 401, 'revoking is the default');
 });
 
-test('making a token needs your password, and wrong ones count against sign-in', async () => {
+test('making a token needs your password, and wrong ones are limited per session', async () => {
   await setLimits({ signInPerMinute: 3 });
   const missing = await asUser('POST', '/api/v1/tokens', { name: 'agent', scope: 'read', expiresInDays: null });
   assert.equal(missing.statusCode, 400);
@@ -98,7 +98,97 @@ test('making a token needs your password, and wrong ones count against sign-in',
     assert.equal(res.json().fields.password, 'This password is wrong.');
   }
   assert.equal((await newToken()).statusCode, 429);
-  assert.equal((await login('owner', OWNER_PW)).statusCode, 429);
+  assert.equal((await login('owner', OWNER_PW)).statusCode, 200, 'signing in is counted apart');
+});
+
+// ── F3: known devices ──
+const deviceOf = (res: LightMyRequestResponse) => {
+  const c = res.cookies.find((x) => x.name.endsWith('setryx_device'));
+  return c ? `${c.name}=${c.value}` : '';
+};
+/** Strangers use up the owner's shared count. */
+const flood = async () => {
+  for (let i = 0; i < 3; i++) assert.equal((await login('owner', 'wrong password 1')).statusCode, 401);
+  assert.equal((await login('owner', OWNER_PW)).statusCode, 429, 'a new device waits');
+};
+
+test('a device that signed in before isn’t locked out by strangers guessing', async () => {
+  await setLimits({ signInPerMinute: 3 });
+  const first = await login('owner', OWNER_PW);
+  const device = deviceOf(first);
+  assert.ok(device, 'signing in leaves a device cookie');
+  assert.equal(first.cookies.find((x) => x.name === 'setryx_device')!.httpOnly, true);
+
+  // Signing out keeps it, so you can sign back in during an attack.
+  const out = await app.inject({ method: 'POST', url: '/api/v1/auth/logout', headers: { cookie: `${cookieOf(first)}; ${device}` } });
+  assert.ok(!out.cookies.some((x) => x.name.endsWith('setryx_device')));
+
+  await flood();
+  assert.equal((await login('owner', OWNER_PW, { cookie: device })).statusCode, 200);
+  // A forged or another account's device id doesn't help.
+  assert.equal((await login('owner', OWNER_PW, { cookie: 'setryx_device=made-up' })).statusCode, 429);
+  await asUser('POST', '/api/v1/admin/users', { username: 'pat', displayName: 'Pat', password: 'pat password 12', role: 'user' });
+  const patDevice = deviceOf(await login('pat', 'pat password 12'));
+  assert.equal((await login('owner', OWNER_PW, { cookie: patDevice })).statusCode, 429);
+});
+
+test('wrong passwords from a known device are limited on their own', async () => {
+  await setLimits({ signInPerMinute: 3 });
+  const device = deviceOf(await login('owner', OWNER_PW));
+  for (let i = 0; i < 3; i++) assert.equal((await login('owner', 'wrong password 1', { cookie: device })).statusCode, 401);
+  assert.equal((await login('owner', OWNER_PW, { cookie: device })).statusCode, 429);
+  assert.equal((await login('owner', OWNER_PW)).statusCode, 200, 'the shared count is untouched');
+});
+
+test('one browser can be known to several accounts', async () => {
+  await setLimits({ signInPerMinute: 3 });
+  await asUser('POST', '/api/v1/admin/users', { username: 'pat', displayName: 'Pat', password: 'pat password 12', role: 'user' });
+  const first = await login('owner', OWNER_PW);
+  const device = deviceOf(first);
+  const second = await login('pat', 'pat password 12', { cookie: device });
+  assert.equal(deviceOf(second) || device, device, 'the same id is reused');
+  await flood();
+  assert.equal((await login('owner', OWNER_PW, { cookie: device })).statusCode, 200);
+});
+
+test('changing the password and signing out everywhere else forget other devices', async () => {
+  await setLimits({ signInPerMinute: 3 });
+  const other = deviceOf(await login('owner', OWNER_PW));
+  const here = await login('owner', OWNER_PW);
+  const hereCookie = `${cookieOf(here)}; ${deviceOf(here)}`;
+  const res = await asUser('DELETE', '/api/v1/me/sessions', undefined, hereCookie);
+  assert.equal(res.statusCode, 204);
+  await flood();
+  assert.equal((await login('owner', OWNER_PW, { cookie: other })).statusCode, 429, 'the other device is forgotten');
+  assert.equal((await login('owner', OWNER_PW, { cookie: deviceOf(here) })).statusCode, 200, 'this one is kept');
+});
+
+test('an admin reset forgets the account’s devices', async () => {
+  await setLimits({ signInPerMinute: 3 });
+  const { user } = (await asUser('POST', '/api/v1/admin/users', { username: 'pat', displayName: 'Pat', password: 'pat password 12', role: 'user' })).json();
+  const device = deviceOf(await login('pat', 'pat password 12'));
+  assert.equal((await asUser('POST', `/api/v1/admin/users/${user.id}/password`, { password: 'pat password 34' })).statusCode, 204);
+  for (let i = 0; i < 3; i++) await login('pat', 'wrong password 1');
+  assert.equal((await login('pat', 'pat password 34', { cookie: device })).statusCode, 429);
+});
+
+test('admins see which accounts are being guessed', async () => {
+  await setLimits({ signInPerMinute: 3 });
+  let res = await asUser('GET', '/api/v1/admin/sign-in-alerts');
+  assert.deepEqual(res.json(), { alerts: [] });
+  await flood();
+  await login('owner', 'wrong password 1');
+  res = await asUser('GET', '/api/v1/admin/sign-in-alerts');
+  const [alert] = res.json().alerts;
+  assert.equal(alert.username, 'owner');
+  assert.equal(alert.refused, 2);
+  // Unknown names and known devices running out don't raise alerts.
+  for (let i = 0; i < 5; i++) await login('nobody', 'wrong password 1');
+  assert.equal((await asUser('GET', '/api/v1/admin/sign-in-alerts')).json().alerts.length, 1);
+  // Not for non-admins.
+  await asUser('POST', '/api/v1/admin/users', { username: 'pat', displayName: 'Pat', password: 'pat password 12', role: 'user' });
+  const pat = cookieOf(await login('pat', 'pat password 12'));
+  assert.equal((await asUser('GET', '/api/v1/admin/sign-in-alerts', undefined, pat)).statusCode, 403);
 });
 
 // ── F5 to F8 ──

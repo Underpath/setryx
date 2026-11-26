@@ -6,11 +6,12 @@ import { type Config, hostAllowed } from './config.ts';
 import type { DB } from './db.ts';
 import { type ResolvedToken, resolveApiToken, tokenMayUse } from './api-tokens.ts';
 import { Backups } from './backup.ts';
-import { Limits, RateLimiter } from './limits.ts';
+import { Limits, LockoutWatch, RateLimiter } from './limits.ts';
+import { DEVICE_COOKIE, DEVICE_KEEP_DAYS, newDeviceId, rememberDevice } from './devices.ts';
 import { PasswordsBusyError } from './passwords.ts';
 import { storageUsed } from './storage.ts';
 import { HttpError, isSameOrigin, sendError } from './http.ts';
-import { SESSION_COOKIE, resolveSession } from './sessions.ts';
+import { SESSION_COOKIE, resolveSession, sha256 } from './sessions.ts';
 import { type UserRecord, findUserById } from './users.ts';
 import { authRoutes } from './routes/auth.ts';
 import { meRoutes } from './routes/me.ts';
@@ -31,6 +32,7 @@ declare module 'fastify' {
     backups: Backups;
     limits: Limits;
     rateLimiter: RateLimiter;
+    lockouts: LockoutWatch;
     /** Marks the server's own in-process requests (MCP tools calling the API), which aren't counted twice. */
     internalKey: string;
   }
@@ -54,6 +56,7 @@ export async function buildApp(config: Config, db: DB, opts: { logger?: boolean 
   app.decorate('backups', new Backups(db, config.dataDir));
   app.decorate('limits', new Limits(db));
   app.decorate('rateLimiter', new RateLimiter());
+  app.decorate('lockouts', new LockoutWatch());
   app.decorate('internalKey', randomBytes(24).toString('base64url'));
   app.decorateRequest('user', null);
   app.decorateRequest('sessionToken', null);
@@ -241,16 +244,52 @@ export function limitRequest(req: FastifyRequest, reply: FastifyReply, key: stri
  * parallel can't all slip through; call the returned function to give it back
  * when the password was right.
  */
-export function reservePasswordAttempt(req: FastifyRequest, reply: FastifyReply, account: string): () => void {
-  const key = `password:${account}`;
+/**
+ * Takes one wrong-password attempt from `bucket` before the password is checked
+ * (and gives it back when it was right). `watchUserId` marks the account's
+ * shared count, whose running out is logged and shown to admins.
+ */
+export function reservePasswordAttempt(req: FastifyRequest, reply: FastifyReply, bucket: string, watchUserId?: string): () => void {
+  const key = `password:${bucket}`;
   const perMinute = req.server.limits.get().signInPerMinute;
   const taken = req.server.rateLimiter.take(key, perMinute);
   if (!taken.ok) {
+    if (watchUserId && req.server.lockouts.refused(watchUserId)) {
+      req.log.warn(
+        { userId: watchUserId, ip: req.ip, refused: req.server.lockouts.count(watchUserId) },
+        'Too many wrong passwords for this account; refusing sign-ins from devices it has not used before',
+      );
+    }
     reply.header('Retry-After', taken.retryAfterS);
     const wait = taken.retryAfterS === 1 ? 'a second' : `${taken.retryAfterS} seconds`;
     throw new HttpError(429, 'rate_limited', `Too many wrong passwords for this account. Wait ${wait} and try again.`);
   }
   return () => req.server.rateLimiter.refund(key, perMinute);
+}
+
+/** Password checks while signed in (changing it, making a token) count per session, apart from sign-in. */
+export function sessionBucket(req: FastifyRequest): string {
+  return req.sessionToken ? `session:${sha256(req.sessionToken).slice(0, 32)}` : `user:${req.user!.id}`;
+}
+
+const SECURE_DEVICE_COOKIE = `__Host-${DEVICE_COOKIE}`;
+
+/** This browser's known-device id, if it has a valid one. */
+export function deviceIdOf(req: FastifyRequest): string | null {
+  const raw = req.cookies[SECURE_DEVICE_COOKIE] ?? req.cookies[DEVICE_COOKIE];
+  if (!raw) return null;
+  const unsigned = req.unsignCookie(raw);
+  return unsigned.valid && unsigned.value ? unsigned.value : null;
+}
+
+/** Marks this browser as known to the account after a password sign-in. It outlives signing out on purpose. */
+export function rememberThisDevice(req: FastifyRequest, reply: FastifyReply, userId: string): void {
+  const id = deviceIdOf(req) ?? newDeviceId();
+  rememberDevice(req.server.db, id, userId);
+  const secure = useSecureCookie(req);
+  const expires = new Date(Date.now() + DEVICE_KEEP_DAYS * 86_400_000);
+  reply.setCookie(secure ? SECURE_DEVICE_COOKIE : DEVICE_COOKIE, id, { signed: true, httpOnly: true, sameSite: 'lax', secure, path: '/', expires });
+  if (secure && req.cookies[DEVICE_COOKIE]) reply.clearCookie(DEVICE_COOKIE, { path: '/' });
 }
 
 export function requireUser(req: FastifyRequest): UserRecord {
