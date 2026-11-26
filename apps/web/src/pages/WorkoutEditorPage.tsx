@@ -292,9 +292,9 @@ export function WorkoutEditorPage() {
       {draft.items.length > 0 && <p className="small muted" style={{ margin: '18px 0' }}>About {formatMinutes(estimate)}. The final rest is skipped automatically.</p>}
 
       {!isNew && (
-        <div className="sheet-actions" style={{ margin: '8px 0 40px' }}>
+        <div className="split-actions" style={{ margin: '8px 0 40px' }}>
           <button
-            className="btn btn-quiet btn-sm"
+            className="btn btn-strong btn-sm"
             type="button"
             disabled={dirty || dup.isPending}
             title={dirty ? 'Save first to duplicate' : undefined}
@@ -302,7 +302,7 @@ export function WorkoutEditorPage() {
           >
             Duplicate workout
           </button>
-          <button className="btn btn-danger btn-sm" type="button" onClick={() => setEditing({ kind: 'delete' })}>Delete workout</button>
+          <button className="btn btn-quiet btn-danger btn-sm" type="button" onClick={() => setEditing({ kind: 'delete' })}>Delete workout</button>
         </div>
       )}
 
