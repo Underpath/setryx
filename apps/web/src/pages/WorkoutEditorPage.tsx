@@ -20,7 +20,8 @@ import { type BlockedNav, useAllowNextNavigation, useBackHandler } from '../comp
 
 type Draft = { name: string; icon: string; notes: string | null; items: WorkoutItem[] };
 const EMPTY: Draft = { name: '', icon: '', notes: null, items: [] };
-const ICONS = ['🫷', '🫸', '🤛', '🤜', '💪', '🏋️', '🦵', '🔥', '⚡', '🧘'];
+// Only emoji old enough that every device can draw them (none newer than 2018).
+const ICONS = ['🏃', '🤸', '🤛', '🤜', '💪', '🏋️', '🦵', '🔥', '⚡', '🧘'];
 
 
 function firstGrapheme(s: string): string {
