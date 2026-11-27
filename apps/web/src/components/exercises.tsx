@@ -10,9 +10,19 @@ export function exerciseMeta(e: Exercise): string {
   return parts.length ? parts.join(' / ') : e.isCustom ? 'Your exercise' : '';
 }
 
-/** Search box, filters and a result list. Used by the Library page and the picker. */
-export function ExerciseBrowser({ onPick, pickLabel, onInfo }: { onPick: (e: Exercise) => void; pickLabel?: string; onInfo?: (e: Exercise) => void }) {
-  const [f, setF] = useState<ExerciseFilters>({ q: '', muscle: '', equipment: '', custom: false });
+export const noFilters: ExerciseFilters = { q: '', muscle: '', equipment: '', custom: false };
+
+/** Search box, filters and a result list. Pass filters/onFilters to keep the search when the browser closes and reopens. */
+export function ExerciseBrowser({ onPick, pickLabel, onInfo, filters, onFilters }: {
+  onPick: (e: Exercise) => void;
+  pickLabel?: string;
+  onInfo?: (e: Exercise) => void;
+  filters?: ExerciseFilters;
+  onFilters?: (f: ExerciseFilters) => void;
+}) {
+  const [own, setOwn] = useState<ExerciseFilters>(noFilters);
+  const f = filters ?? own;
+  const setF = (next: (prev: ExerciseFilters) => ExerciseFilters) => (onFilters ? onFilters(next(f)) : setOwn(next));
   const search = useExerciseSearch(f);
   const facets = useExerciseFacets();
   const set = (patch: Partial<ExerciseFilters>) => setF((prev) => ({ ...prev, ...patch }));
@@ -199,18 +209,25 @@ export function CustomExerciseSheet({ exercise, initial, onClose, onSaved }: { e
 }
 
 /** Pick an exercise for a workout step, or make a new one on the spot. */
-export function ExercisePickerSheet({ title, onPick, onClose }: { title: string; onPick: (e: Exercise) => void; onClose: () => void }) {
+export function ExercisePickerSheet({ replacing, onPick, onClose }: { replacing?: string; onPick: (e: Exercise) => void; onClose: () => void }) {
   const [creating, setCreating] = useState(false);
   const [info, setInfo] = useState<Exercise | null>(null);
+  // Kept here, so the search survives opening and closing an exercise's details.
+  const [filters, setFilters] = useState<ExerciseFilters>(noFilters);
   if (creating) return <CustomExerciseSheet onClose={() => setCreating(false)} onSaved={onPick} />;
   // Details replace the list while open; closing them comes back to the list.
-  if (info) return <ExerciseDetailSheet exercise={info} onClose={() => setInfo(null)} action={{ label: `${title === 'Change exercise' ? 'Use' : 'Add'} this exercise`, onClick: () => onPick(info) }} />;
+  if (info) return <ExerciseDetailSheet exercise={info} onClose={() => setInfo(null)} action={{ label: `${replacing !== undefined ? 'Use' : 'Add'} this exercise`, onClick: () => onPick(info) }} />;
   return (
-    <Sheet title={title} onClose={onClose}>
+    <Sheet title={replacing !== undefined ? 'Change exercise' : 'Add exercise'} onClose={onClose}>
+      {replacing && (
+        <p className="muted">
+          Changing <strong>{replacing}</strong>. The step keeps its reps, weight and notes.
+        </p>
+      )}
       <button className="btn btn-quiet btn-sm" type="button" onClick={() => setCreating(true)} style={{ justifySelf: 'start' }}>
         <Icon name="plus" /> New exercise
       </button>
-      <ExerciseBrowser onPick={onPick} pickLabel="Add" onInfo={setInfo} />
+      <ExerciseBrowser onPick={onPick} pickLabel={replacing !== undefined ? 'Use' : 'Add'} onInfo={setInfo} filters={filters} onFilters={setFilters} />
     </Sheet>
   );
 }

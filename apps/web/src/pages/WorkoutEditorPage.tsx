@@ -119,6 +119,11 @@ export function WorkoutEditorPage() {
     targetWeight: null, tempo: null, rir: null, notes: null, equipmentNote: e.equipment.length ? e.equipment.join(', ') : null,
   });
 
+  /** The name of the exercise a step is being changed from, for the picker. */
+  const replacingName = (p?: Path): string => {
+    const cur = p && findStep(p);
+    return cur?.kind === 'exercise' ? (exercises[cur.exerciseId]?.name ?? 'this exercise') : 'this exercise';
+  };
   const onPick = (e: Exercise) => {
     if (editing?.kind !== 'pick') return;
     setExercises((m) => ({ ...m, [e.id]: e }));
@@ -308,7 +313,7 @@ export function WorkoutEditorPage() {
       )}
 
       {/* ── Sheets ── */}
-      {editing?.kind === 'pick' && <ExercisePickerSheet title={editing.mode === 'replace' ? 'Change exercise' : 'Add exercise'} onPick={onPick} onClose={() => setEditing(editing.replace ? { kind: 'exercise', path: editing.replace, isNew: false } : null)} />}
+      {editing?.kind === 'pick' && <ExercisePickerSheet replacing={editing.mode === 'replace' ? replacingName(editing.replace) : undefined} onPick={onPick} onClose={() => setEditing(editing.replace ? { kind: 'exercise', path: editing.replace, isNew: false } : null)} />}
 
       {editing?.kind === 'exercise' && editingStep?.kind === 'exercise' && (
         <ExerciseStepSheet
