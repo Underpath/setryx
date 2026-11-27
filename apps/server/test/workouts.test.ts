@@ -89,7 +89,7 @@ test('create, read, replace, duplicate and delete a workout', async () => {
   assert.equal(replaced.json().workout.items.length, 1);
 
   const dup = await req('POST', `/api/v1/workouts/${workout.id}/duplicate`);
-  assert.equal(dup.json().workout.name, 'Push A2 (copy)');
+  assert.equal(dup.json().workout.name, 'Push A2 copy');
   assert.notEqual(dup.json().workout.items[0].id, 'b', 'copies get new step ids');
 
   assert.equal((await req('DELETE', `/api/v1/workouts/${workout.id}`)).statusCode, 204);

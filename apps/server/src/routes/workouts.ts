@@ -61,7 +61,7 @@ export const workoutRoutes: FastifyPluginAsync = async (app) => {
   app.post<IdParams>('/workouts/:id/duplicate', async (req, reply) => {
     const src = getWorkout(db, req.user!.id, req.params.id);
     if (!src) throw new HttpError(404, 'not_found', 'This workout doesn’t exist or was deleted.');
-    const copy = createWorkout(db, req.user!.id, { name: `${src.name} (copy)`.slice(0, 80), icon: src.icon, notes: src.notes, items: reidItems(src.items) });
+    const copy = createWorkout(db, req.user!.id, { name: `${src.name.slice(0, 75)} copy`, icon: src.icon, notes: src.notes, items: reidItems(src.items) });
     return reply.status(201).send(withExercises(req.user!.id, copy));
   });
 

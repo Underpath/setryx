@@ -614,7 +614,7 @@ export const TOOLS: Tool[] = [
     title: 'Duplicate a workout',
     description: 'Copy a workout, for example to make a variation.',
     write: true,
-    input: z.object({ workout: ref('Workout'), name: text(80).min(1).optional().describe('Name for the copy; defaults to “<name> (copy)”.') }),
+    input: z.object({ workout: ref('Workout'), name: text(80).min(1).optional().describe('Name for the copy; defaults to “<name> copy”.') }),
     async run(ctx, { workout, name }) {
       const w = await findWorkout(ctx, workout);
       let r = await ctx.api<{ workout: Workout; exercises: Record<string, Exercise> }>('POST', `/workouts/${enc(w.id)}/duplicate`);
