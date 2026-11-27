@@ -139,7 +139,7 @@ function NewTokenSheet({ onClose, onCreated }: { onClose: () => void; onCreated:
             ))}
           </div>
         </div>
-        <Field label="Your password" name="password" type="password" autoComplete="current-password" error={fields.password} hint="A token keeps working after you sign out, so setryx checks it’s you." />
+        <Field label="Your password" name="password" type="password" autoComplete="current-password" error={fields.password} hint="A token keeps working after you sign out, so Setryx checks it’s you." />
         <FormError error={general} />
         <button className="btn btn-primary btn-block" type="submit" disabled={m.isPending}>Create token</button>
       </form>

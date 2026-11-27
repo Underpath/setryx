@@ -40,6 +40,68 @@ export function Field({ label, error, hint, id, ...input }: FieldProps) {
   );
 }
 
+/**
+ * A field for choosing a new password. Hidden, it's typed twice; "Show" makes
+ * it readable and drops the second box, since you can see what you typed.
+ * Call check() before submitting: it shows any mismatch and says whether to go on.
+ * The second box has no name, so it isn't sent.
+ */
+export function useNewPassword({ name, label, hint, error, required }: { name: string; label: string; hint?: string; error?: string; required?: boolean }) {
+  const id = useId();
+  const [value, setValue] = useState('');
+  const [again, setAgain] = useState('');
+  const [shown, setShown] = useState(false);
+  const [tried, setTried] = useState(false);
+  const problem = shown || value === '' ? null : again === '' ? 'Type the password again.' : again !== value ? 'The two passwords don’t match.' : null;
+  const check = () => {
+    setTried(true);
+    return !problem;
+  };
+  const reset = () => (setValue(''), setAgain(''), setTried(false));
+  const shownHint = shown ? `${hint ? `${hint} ` : ''}It’s shown, so you only type it once.` : hint;
+  const describedBy = error ? `${id}-err` : shownHint ? `${id}-hint` : undefined;
+  const field = (
+    <>
+      <div className="field">
+        <label htmlFor={id}>{label}</label>
+        <div className="password-wrap">
+          <input
+            className="input"
+            id={id}
+            name={name}
+            type={shown ? 'text' : 'password'}
+            autoComplete="new-password"
+            autoCapitalize="none"
+            autoCorrect="off"
+            spellCheck={false}
+            required={required}
+            value={value}
+            onChange={(e) => setValue(e.target.value)}
+            aria-invalid={error ? true : undefined}
+            aria-describedby={describedBy}
+          />
+          <button className="password-toggle" type="button" aria-controls={id} aria-pressed={shown} onClick={() => setShown(!shown)}>
+            {shown ? 'Hide' : 'Show'}
+            <span className="visually-hidden"> password</span>
+          </button>
+        </div>
+        {error ? <div className="field-error" id={`${id}-err`}>{error}</div> : shownHint ? <div className="hint" id={`${id}-hint`}>{shownHint}</div> : null}
+      </div>
+      {!shown && (
+        <Field
+          label="Type it again"
+          type="password"
+          autoComplete="new-password"
+          value={again}
+          onChange={(e) => setAgain(e.target.value)}
+          error={tried && problem ? problem : undefined}
+        />
+      )}
+    </>
+  );
+  return { field, check, reset };
+}
+
 export function FormError({ error }: { error: unknown }) {
   if (!error) return null;
   const message = error instanceof Error ? error.message : 'Something went wrong.';

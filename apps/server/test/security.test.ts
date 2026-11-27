@@ -222,6 +222,8 @@ test('security headers are on API answers and errors', async () => {
     assert.equal(res.headers['x-content-type-options'], 'nosniff');
     assert.equal(res.headers['x-frame-options'], 'DENY');
     assert.match(String(res.headers['content-security-policy']), /frame-ancestors 'none'/);
+    // The keep-screen-on fallback plays a tiny built-in video.
+    assert.match(String(res.headers['content-security-policy']), /media-src 'self' data:/);
     assert.equal(res.headers['referrer-policy'], 'same-origin');
   }
 });

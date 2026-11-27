@@ -11,7 +11,8 @@ test('a full workout: setup, play, review, save, stats', async ({ page }) => {
   await expect(page).toHaveURL(/\/setup$/);
   await page.getByLabel('Your name').fill('Test Lifter');
   await page.getByLabel('Username').fill('lifter');
-  await page.getByLabel('Password').fill('a long test password');
+  await page.getByLabel('Password', { exact: true }).fill('a long test password');
+  await page.getByLabel('Type it again').fill('a long test password');
   await page.getByRole('button', { name: 'Create admin account' }).click();
   await expect(page.getByRole('heading', { name: 'Today' })).toBeVisible();
 

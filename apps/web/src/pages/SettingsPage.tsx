@@ -5,7 +5,7 @@ import { type BackupFile, type BackupSettings, type PublicUser, type SignInSessi
 import { api } from '../api.ts';
 import { useMe, useSetMe } from '../session.ts';
 import { useSignOut } from '../components/SignOut.tsx';
-import { Field, FormError, Icon, Sheet, Switch, fieldErrors, useToast } from '../components/ui.tsx';
+import { Field, FormError, Icon, Sheet, Switch, fieldErrors, useNewPassword, useToast } from '../components/ui.tsx';
 import { ago, deviceName, useMediaQuery } from '../util.ts';
 import { InvitesSection, UsersSection } from './AdminPage.tsx';
 import { ApiTokensSection } from './ApiTokensSection.tsx';
@@ -493,11 +493,19 @@ function PasswordSheet({ onClose }: { onClose: () => void }) {
     },
   });
   const { fields, general } = fieldErrors(m.error);
+  const pw = useNewPassword({ name: 'newPassword', label: 'New password', hint: 'At least 10 characters.', error: fields.newPassword });
   return (
     <Sheet title="Change password" onClose={onClose}>
-      <form className="form" onSubmit={(e: FormEvent<HTMLFormElement>) => (e.preventDefault(), m.mutate(Object.fromEntries(new FormData(e.currentTarget)) as Record<string, string>))}>
+      <form
+        className="form"
+        onSubmit={(e: FormEvent<HTMLFormElement>) => {
+          e.preventDefault();
+          const v = Object.fromEntries(new FormData(e.currentTarget)) as Record<string, string>;
+          if (pw.check()) m.mutate(v);
+        }}
+      >
         <Field label="Current password" name="currentPassword" type="password" autoComplete="current-password" error={fields.currentPassword} />
-        <Field label="New password" name="newPassword" type="password" autoComplete="new-password" error={fields.newPassword} hint="At least 10 characters." />
+        {pw.field}
         <div className="field">
           <label className="check">
             <input type="checkbox" checked={revokeTokens} onChange={(e) => setRevokeTokens(e.target.checked)} aria-describedby="revoke-hint" /> Also revoke my API tokens

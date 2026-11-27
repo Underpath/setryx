@@ -4,7 +4,7 @@ import { Link, Navigate, useNavigate, useParams } from 'react-router';
 import type { PublicUser } from '@setryx/shared';
 import { api } from '../api.ts';
 import { useSetMe } from '../session.ts';
-import { Field, FormError, fieldErrors } from '../components/ui.tsx';
+import { Field, FormError, fieldErrors, useNewPassword } from '../components/ui.tsx';
 
 function AuthLayout({ tagline, children }: { tagline: string; children: ReactNode }) {
   return (
@@ -35,14 +35,15 @@ export function SetupPage() {
     },
   });
   const { fields, general } = fieldErrors(m.error);
+  const pw = useNewPassword({ name: 'password', label: 'Password', hint: 'At least 10 characters.', error: fields.password, required: true });
   return (
     <AuthLayout tagline="Your workouts, on your own server.">
       <h1 className="h2">Create the admin account</h1>
       <p className="muted">This is the first account on this server, so it becomes the admin. You can add other people afterwards.</p>
-      <form className="form" onSubmit={(e) => m.mutate(formValues(e))} noValidate>
+      <form className="form" onSubmit={(e) => { const v = formValues(e); if (pw.check()) m.mutate(v); }} noValidate>
         <Field label="Your name" name="displayName" autoComplete="name" required error={fields.displayName} />
         <Field label="Username" name="username" autoComplete="username" autoCapitalize="none" spellCheck={false} required error={fields.username} hint="Letters, numbers, dots, dashes and underscores." />
-        <Field label="Password" name="password" type="password" autoComplete="new-password" required error={fields.password} hint="At least 10 characters." />
+        {pw.field}
         <FormError error={general} />
         <button className="btn btn-primary btn-block" type="submit" disabled={m.isPending}>
           {m.isPending ? 'Creating account…' : 'Create admin account'}
@@ -102,6 +103,7 @@ export function SignupPage() {
     },
   });
   const { fields, general } = fieldErrors(m.error);
+  const pw = useNewPassword({ name: 'password', label: 'Password', hint: 'At least 10 characters.', error: fields.password, required: true });
 
   if (info.isPending) return <div className="center-load">Checking your link…</div>;
   if (!token && !info.data?.openSignup) return <Navigate to="/login" replace />;
@@ -118,10 +120,10 @@ export function SignupPage() {
     <AuthLayout tagline={token ? 'You’ve been invited to train here.' : 'Your workouts, on your own server.'}>
       <h1 className="h2">Create your account</h1>
       <p className="muted">Your workouts and history are private to you.</p>
-      <form className="form" onSubmit={(e) => m.mutate(formValues(e))} noValidate>
+      <form className="form" onSubmit={(e) => { const v = formValues(e); if (pw.check()) m.mutate(v); }} noValidate>
         <Field label="Your name" name="displayName" autoComplete="name" required error={fields.displayName} />
         <Field label="Username" name="username" autoComplete="username" autoCapitalize="none" spellCheck={false} required error={fields.username} hint="Letters, numbers, dots, dashes and underscores." />
-        <Field label="Password" name="password" type="password" autoComplete="new-password" required error={fields.password} hint="At least 10 characters." />
+        {pw.field}
         <FormError error={general} />
         <button className="btn btn-primary btn-block" type="submit" disabled={m.isPending}>
           {m.isPending ? 'Creating account…' : 'Create account'}

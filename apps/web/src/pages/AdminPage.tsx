@@ -5,7 +5,7 @@ import { Link } from 'react-router';
 import { ago } from '../util.ts';
 import { api } from '../api.ts';
 import { useSetMe } from '../session.ts';
-import { Field, FormError, Icon, Sheet, Switch, fieldErrors, useToast } from '../components/ui.tsx';
+import { Field, FormError, Icon, Sheet, Switch, fieldErrors, useNewPassword, useToast } from '../components/ui.tsx';
 
 const dateFmt = new Intl.DateTimeFormat(undefined, { day: 'numeric', month: 'short' });
 const formData = (e: FormEvent<HTMLFormElement>) => (e.preventDefault(), Object.fromEntries(new FormData(e.currentTarget)) as Record<string, string>);
@@ -78,13 +78,14 @@ function AddUserSheet({ onClose }: { onClose: () => void }) {
     },
   });
   const { fields, general } = fieldErrors(m.error);
+  const pw = useNewPassword({ name: 'password', label: 'Password', hint: 'At least 10 characters.', error: fields.password });
   return (
     <Sheet title="Add a person" onClose={onClose}>
       <p className="muted small">Give them the username and password yourself. They can change the password after signing in. To let them choose their own, send an invite link instead.</p>
-      <form className="form" onSubmit={(e) => m.mutate(formData(e))} noValidate>
+      <form className="form" onSubmit={(e) => { const v = formData(e); if (pw.check()) m.mutate(v); }} noValidate>
         <Field label="Name" name="displayName" error={fields.displayName} />
         <Field label="Username" name="username" autoCapitalize="none" spellCheck={false} error={fields.username} />
-        <Field label="Password" name="password" type="password" autoComplete="new-password" error={fields.password} hint="At least 10 characters." />
+        {pw.field}
         <label className="setting"><span className="main"><span className="name">Make them an admin</span><span className="meta">Admins can add and manage people.</span></span><input type="checkbox" role="switch" className="switch" name="role" /></label>
         <FormError error={general} />
         <button className="btn btn-primary btn-block" type="submit" disabled={m.isPending}>Add person</button>
@@ -115,6 +116,7 @@ function ManageUserSheet({ me, user, onClose }: { me: PublicUser; user: PublicUs
   });
   const isMe = user.id === me.id;
   const resetErrors = fieldErrors(reset.error);
+  const resetPw = useNewPassword({ name: 'password', label: 'Set a new password', error: resetErrors.fields.password, hint: isMe ? 'At least 10 characters.' : 'At least 10 characters. They’ll be signed out everywhere.' });
   const [confirmOff, setConfirmOff] = useState(false);
   if (confirmOff) {
     return (
@@ -135,8 +137,8 @@ function ManageUserSheet({ me, user, onClose }: { me: PublicUser; user: PublicUs
         )}
       </ul>
       <FormError error={update.error} />
-      <form className="form" onSubmit={(e) => reset.mutate(formData(e).password ?? '')} noValidate>
-        <Field label="Set a new password" name="password" type="password" autoComplete="new-password" error={resetErrors.fields.password} hint={isMe ? 'At least 10 characters.' : 'At least 10 characters. They’ll be signed out everywhere.'} />
+      <form className="form" onSubmit={(e) => { const v = formData(e).password ?? ''; if (resetPw.check()) reset.mutate(v); }} noValidate>
+        {resetPw.field}
         <FormError error={resetErrors.general} />
         <button className="btn btn-quiet btn-block" type="submit" disabled={reset.isPending}>Reset password</button>
       </form>
