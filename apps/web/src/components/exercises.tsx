@@ -11,7 +11,7 @@ export function exerciseMeta(e: Exercise): string {
 }
 
 /** Search box, filters and a result list. Used by the Library page and the picker. */
-export function ExerciseBrowser({ onPick, pickLabel }: { onPick: (e: Exercise) => void; pickLabel?: string }) {
+export function ExerciseBrowser({ onPick, pickLabel, onInfo }: { onPick: (e: Exercise) => void; pickLabel?: string; onInfo?: (e: Exercise) => void }) {
   const [f, setF] = useState<ExerciseFilters>({ q: '', muscle: '', equipment: '', custom: false });
   const search = useExerciseSearch(f);
   const facets = useExerciseFacets();
@@ -37,7 +37,7 @@ export function ExerciseBrowser({ onPick, pickLabel }: { onPick: (e: Exercise) =
       <p className="small muted" aria-live="polite">{search.data ? `${search.data.total} exercise${search.data.total === 1 ? '' : 's'}` : 'Searching…'}</p>
       <ul className="rows">
         {search.data?.exercises.map((e) => (
-          <li key={e.id}>
+          <li key={e.id} className={onInfo ? 'pick-row' : undefined}>
             <button className="row row-button" type="button" onClick={() => onPick(e)} aria-label={pickLabel ? `${pickLabel}: ${e.name}` : e.name}>
               <span className="main">
                 <span className="name">{e.name}</span>
@@ -45,6 +45,11 @@ export function ExerciseBrowser({ onPick, pickLabel }: { onPick: (e: Exercise) =
               </span>
               {e.isCustom && <span className="tag tag-blue">Mine</span>}
             </button>
+            {onInfo && (
+              <button className="icon-btn" type="button" aria-label={`Details for ${e.name}`} onClick={() => onInfo(e)}>
+                <Icon name="info" />
+              </button>
+            )}
           </li>
         ))}
       </ul>
@@ -72,7 +77,7 @@ export function ExercisePhotos({ images, name }: { images: string[]; name: strin
   );
 }
 
-export function ExerciseDetailSheet({ exercise, onClose, onEdit, onDuplicate }: { exercise: Exercise; onClose: () => void; onEdit?: () => void; onDuplicate?: () => void }) {
+export function ExerciseDetailSheet({ exercise, onClose, onEdit, onDuplicate, action }: { exercise: Exercise; onClose: () => void; onEdit?: () => void; onDuplicate?: () => void; action?: { label: string; onClick: () => void } }) {
   return (
     <Sheet title={exercise.name} onClose={onClose}>
       {exerciseMeta(exercise) && <p className="muted">{exerciseMeta(exercise)}</p>}
@@ -84,6 +89,7 @@ export function ExerciseDetailSheet({ exercise, onClose, onEdit, onDuplicate }: 
         <p className="small muted">No instructions yet.</p>
       )}
       <div className="sheet-actions">
+        {action && <button className="btn btn-primary" type="button" onClick={action.onClick}>{action.label}</button>}
         {exercise.isCustom && onEdit && <button className="btn btn-primary" type="button" onClick={onEdit}>Edit exercise</button>}
         {!exercise.isCustom && onDuplicate && <button className="btn btn-quiet" type="button" onClick={onDuplicate}>Make my own copy</button>}
       </div>
@@ -195,13 +201,16 @@ export function CustomExerciseSheet({ exercise, initial, onClose, onSaved }: { e
 /** Pick an exercise for a workout step, or make a new one on the spot. */
 export function ExercisePickerSheet({ title, onPick, onClose }: { title: string; onPick: (e: Exercise) => void; onClose: () => void }) {
   const [creating, setCreating] = useState(false);
+  const [info, setInfo] = useState<Exercise | null>(null);
   if (creating) return <CustomExerciseSheet onClose={() => setCreating(false)} onSaved={onPick} />;
+  // Details replace the list while open; closing them comes back to the list.
+  if (info) return <ExerciseDetailSheet exercise={info} onClose={() => setInfo(null)} action={{ label: `${title === 'Change exercise' ? 'Use' : 'Add'} this exercise`, onClick: () => onPick(info) }} />;
   return (
     <Sheet title={title} onClose={onClose}>
       <button className="btn btn-quiet btn-sm" type="button" onClick={() => setCreating(true)} style={{ justifySelf: 'start' }}>
         <Icon name="plus" /> New exercise
       </button>
-      <ExerciseBrowser onPick={onPick} pickLabel="Add" />
+      <ExerciseBrowser onPick={onPick} pickLabel="Add" onInfo={setInfo} />
     </Sheet>
   );
 }

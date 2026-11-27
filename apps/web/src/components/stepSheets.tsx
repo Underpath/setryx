@@ -1,6 +1,7 @@
 import { type FormEvent, type ReactNode, useId, useState } from 'react';
 import type { Exercise, ExerciseStep, ExerciseType, RestStep, Superset } from '@setryx/shared';
-import { Field, LeaveDialog, Sheet, useBeforeUnload } from './ui.tsx';
+import { Field, Icon, LeaveDialog, Sheet, useBeforeUnload } from './ui.tsx';
+import { ExerciseDetailSheet } from './exercises.tsx';
 
 /**
  * Wraps a step form: closing with changes asks to save the step or discard the changes.
@@ -115,6 +116,7 @@ export function ExerciseStepSheet({
   };
   const [f, setF] = useState(start);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [info, setInfo] = useState(false);
   const set = (patch: Partial<typeof f>) => setF((p) => ({ ...p, ...patch }));
   const dirty = isNew || JSON.stringify(f) !== JSON.stringify(start);
 
@@ -142,11 +144,21 @@ export function ExerciseStepSheet({
     });
   };
 
+  // The details replace this sheet while open; the step's unsaved changes are kept for when they close.
+  if (info && exercise) return <ExerciseDetailSheet exercise={exercise} onClose={() => setInfo(false)} />;
+
   return (
     <GuardedSheet title={exercise?.name ?? 'Exercise'} what="step" dirty={dirty} onApply={apply} onClose={onClose}>
       {(submit) => (
         <form className="form" onSubmit={submit} noValidate>
-          <button className="btn btn-quiet btn-sm" type="button" onClick={onChangeExercise} style={{ justifySelf: 'start' }}>Change exercise</button>
+          <div className="step-exercise-actions">
+            <button className="btn btn-quiet btn-sm" type="button" onClick={onChangeExercise}>Change exercise</button>
+            {exercise && (
+              <button className="icon-btn" type="button" aria-label={`Details for ${exercise.name}`} onClick={() => setInfo(true)}>
+                <Icon name="info" />
+              </button>
+            )}
+          </div>
           <div className="seg" role="radiogroup" aria-label="Target">
             {(['reps', 'timed'] as ExerciseType[]).map((t) => (
               <button key={t} type="button" role="radio" aria-checked={f.targetType === t} className={f.targetType === t ? 'on' : ''} onClick={() => set({ targetType: t })}>
@@ -172,6 +184,11 @@ export function ExerciseStepSheet({
             <textarea id="step-notes" className="input" rows={3} value={f.notes} onChange={(e) => set({ notes: e.target.value })} />
           </div>
           <button className="btn btn-primary btn-block" type="submit">Save step</button>
+          {isNew ? (
+            <button className="btn btn-block" type="button" onClick={onClose}>Don’t add it</button>
+          ) : (
+            dirty && <button className="btn btn-block" type="button" onClick={onClose}>Discard changes</button>
+          )}
           {!isNew && <StepActionsRow {...actions} close={onClose} />}
         </form>
       )}

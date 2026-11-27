@@ -16,6 +16,7 @@ const paths = {
   search: <><circle cx="11" cy="11" r="7" /><path d="M20 20l-4-4" /></>,
   plus: <path d="M12 5v14M5 12h14" />,
   more: <><circle cx="5" cy="12" r="1" /><circle cx="12" cy="12" r="1" /><circle cx="19" cy="12" r="1" /></>,
+  info: <><circle cx="12" cy="12" r="9" /><path d="M12 11v6M12 7.5v.5" /></>,
 };
 export function Icon({ name, label }: { name: keyof typeof paths; label?: string }) {
   return (
