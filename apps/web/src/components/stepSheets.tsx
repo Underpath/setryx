@@ -183,12 +183,11 @@ export function ExerciseStepSheet({
             <label htmlFor="step-notes">Form cues</label>
             <textarea id="step-notes" className="input" rows={3} value={f.notes} onChange={(e) => set({ notes: e.target.value })} />
           </div>
-          <button className="btn btn-primary btn-block" type="submit">Save step</button>
-          {isNew ? (
-            <button className="btn btn-block" type="button" onClick={onClose}>Don’t add it</button>
-          ) : (
-            dirty && <button className="btn btn-block" type="button" onClick={onClose}>Discard changes</button>
-          )}
+          {/* Both always shown, so nothing moves when the first change is made. */}
+          <div className="save-row">
+            <button className="btn" type="button" onClick={onClose} disabled={!dirty}>{isNew ? 'Don’t add it' : 'Discard changes'}</button>
+            <button className="btn btn-primary" type="submit">Save step</button>
+          </div>
           {!isNew && <StepActionsRow {...actions} close={onClose} />}
         </form>
       )}

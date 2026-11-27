@@ -194,6 +194,7 @@ a { color: var(--blue-text); }
 .pick-row .row-button { flex: 1; min-width: 0; border-bottom: 0; }
 .rows > .pick-row:first-child { border-top: 1px solid var(--rule); }
 .rows > .pick-row:first-child > .row { border-top: 0; }
+.save-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .step-exercise-actions { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .row-button:hover .name, .row-link:hover .name { color: var(--blue-text); }
 .rows > li:first-child > .row { border-top: 1px solid var(--rule); }
