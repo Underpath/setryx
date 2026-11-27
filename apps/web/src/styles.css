@@ -242,10 +242,6 @@ textarea.input { resize: vertical; min-height: 88px; line-height: 1.45; }
 .grip:active { cursor: grabbing; }
 .block-add { display: flex; gap: 4px; padding: 4px 0 2px; }
 .block-add .btn { color: var(--muted); padding: 0 10px; }
-@media (min-width: 1100px) {
-  .editor { max-width: 1100px; }
-  .blocks { grid-template-columns: 1fr 1fr; gap: 18px 28px; }
-}
 
 /* Import */
 .import-row { flex-wrap: wrap; }
