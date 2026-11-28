@@ -40,7 +40,7 @@ test('a full workout: setup, play, review, save, stats', async ({ page }) => {
   await page.getByRole('button', { name: 'Start workout' }).click();
   await expect(page.locator('.ex-name')).toHaveText('Plank');
   const big = page.locator('.big');
-  await expect(big).toHaveText(/^1\ds$/, { timeout: 8_000 }); // past the 3-2-1, counting down from 15
+  await expect(big).toHaveText(/^0:1\d$/, { timeout: 8_000 }); // past the 3-2-1, counting down from 15
 
   // ── The info sheet pauses a timed exercise ──
   await page.getByRole('button', { name: 'Exercise details' }).click();

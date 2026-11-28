@@ -25,7 +25,7 @@ import { formatMinutes, useRoutines, useWorkout } from '../data.ts';
 import { pendingRuns, useOutbox } from '../sync/outbox.ts';
 import { FormError, Icon, Sheet, useToast } from '../components/ui.tsx';
 import { useAllowNextNavigation } from '../components/backGuard.tsx';
-import { clock, duration, uid, useMediaQuery } from '../util.ts';
+import { duration, timer, uid, useMediaQuery } from '../util.ts';
 import { addFinished, announce, clearActive, discardActive, loadActive } from './storage.ts';
 import { usePlayer } from './usePlayer.ts';
 import { useWakeLock } from './wakeLock.ts';
@@ -178,8 +178,11 @@ function Player({ user, initial }: { user: PublicUser; initial: PlayerState }) {
   const tapToLog = settings.tapToLog;
 
   const numeral =
-    p.countdown !== null ? String(p.countdown) : step.kind === 'exercise' && step.targetType === 'reps' ? String(step.targetReps) : clock(left / 1000);
-  const unit = p.countdown !== null ? '' : step.kind === 'exercise' && step.targetType === 'reps' ? 'reps' : left >= 60_000 ? '' : 's';
+    p.countdown !== null ? String(p.countdown) : step.kind === 'exercise' && step.targetType === 'reps' ? String(step.targetReps) : timer(left / 1000);
+  const unit = p.countdown !== null ? '' : step.kind === 'exercise' && step.targetType === 'reps' ? 'reps' : '';
+  // Timers always read m:ss at one size, so the number doesn't jump when it passes a minute.
+  const isTimer = p.countdown === null && !(step.kind === 'exercise' && step.targetType === 'reps');
+  const fit = isTimer ? (numeral.length > 4 ? 0.5 : 0.6) : numeral.length <= 2 ? 1 : numeral.length === 3 ? 0.78 : 0.6;
 
   const title =
     step.kind === 'rest'
@@ -195,7 +198,7 @@ function Player({ user, initial }: { user: PublicUser; initial: PlayerState }) {
       <span className="ex-name">{title}</span>
       <span
         className={`big${state.paused && p.countdown === null ? ' paused' : ''}`}
-        style={{ '--fit': numeral.length <= 2 ? 1 : numeral.length === 3 ? 0.78 : 0.6 } as CSSProperties}
+        style={{ '--fit': fit } as CSSProperties}
         aria-live="off"
       >
         {numeral}
