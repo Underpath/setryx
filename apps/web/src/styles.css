@@ -356,6 +356,7 @@ textarea.input { resize: vertical; min-height: 88px; line-height: 1.45; }
 .t-steps li.now { font-weight: 700; }
 .t-steps li.now .mk { border-color: var(--chalk); background: var(--chalk); box-shadow: 0 0 0 4px rgba(238,240,236,.25); }
 .t-steps .v { font-size: .875rem; color: #A3ACB4; }
+.t-steps .t-round { display: block; font-size: .8rem; font-weight: 400; color: #A3ACB4; }
 .t-panel .controls { margin-top: auto; }
 .t-panel .ctrl.ctrl-next svg { fill: var(--rubber); }
 

@@ -179,8 +179,8 @@ function Player({ user, initial }: { user: PublicUser; initial: PlayerState }) {
 
   const numeral =
     p.countdown !== null ? String(p.countdown) : step.kind === 'exercise' && step.targetType === 'reps' ? String(step.targetReps) : timer(left / 1000);
-  const unit = p.countdown !== null ? '' : step.kind === 'exercise' && step.targetType === 'reps' ? 'reps' : '';
-  // Timers always read m:ss at one size, so the number doesn't jump when it passes a minute.
+  const unit = p.countdown !== null ? '' : step.kind === 'exercise' && step.targetType === 'reps' ? 'reps' : left >= 60_000 ? '' : 's';
+  // Timers keep one size whether they read 1:30 or 45, so the number doesn't jump when it passes a minute.
   const isTimer = p.countdown === null && !(step.kind === 'exercise' && step.targetType === 'reps');
   const fit = isTimer ? (numeral.length > 4 ? 0.5 : 0.6) : numeral.length <= 2 ? 1 : numeral.length === 3 ? 0.78 : 0.6;
 
@@ -555,38 +555,35 @@ function Preview({ preview }: { preview: { label: string; items: string[] } }) {
   );
 }
 
-/** Tablet side panel: the current round as a checklist. */
+/** How many steps the tablet side panel lists: the current one and what follows. */
+const UP_NEXT = 8;
+
+/** Tablet side panel: the current step and the ones coming up, across the whole workout. */
 function RoundPanel({ state }: { state: PlayerState }) {
   const steps = stepsOf(state);
-  const step = currentStep(state)!;
-  const block = state.items[step.blockIndex];
-  const list = steps
-    .map((s, i) => ({ s, i }))
-    .filter(({ s }) => s.blockIndex === step.blockIndex && (s.superset ? s.superset.round === step.superset?.round : true));
+  const list = steps.map((s, i) => ({ s, i })).slice(state.index, state.index + UP_NEXT);
+  const more = steps.length - (state.index + list.length);
   return (
     <>
-      <h2 className="t-h">{block?.kind === 'superset' ? block.label || 'Superset' : state.workoutName}</h2>
-      {step.superset && <div className="sub">Round {step.superset.round} of {step.superset.rounds}</div>}
+      <h2 className="t-h">Up next</h2>
       <ul className="t-steps">
         {list.map(({ s, i }) => {
-          const log = state.logs[i];
-          const cls = i < state.index ? 'done' : i === state.index ? 'now' : '';
           const name = s.kind === 'rest' ? (s.label ?? 'Rest') : (state.exercises[s.exerciseId]?.name ?? 'Exercise');
-          const v =
-            s.kind === 'rest'
-              ? `${s.durationS} s`
-              : log
-                ? `${log.actualReps ?? log.actualDurationS + ' s'}${log.actualWeight != null ? ` × ${log.actualWeight} kg` : ''}`
-                : `${s.targetType === 'reps' ? s.targetReps : s.targetDurationS + ' s'}${s.targetWeight != null ? ` × ${s.targetWeight} kg` : ''}`;
+          const v = s.kind === 'rest' ? `${s.durationS} s` : `${s.targetType === 'reps' ? s.targetReps : s.targetDurationS + ' s'}${s.targetWeight != null ? ` × ${s.targetWeight} kg` : ''}`;
           return (
-            <li key={i} className={cls}>
+            <li key={i} className={i === state.index ? 'now' : ''}>
               <span className="mk" />
-              <span>{name}</span>
+              <span>
+                {name}
+                {s.superset && <span className="t-round">{s.superset.label ? `${s.superset.label}, ` : ''}round {s.superset.round} of {s.superset.rounds}</span>}
+              </span>
               <span className="v">{v}</span>
             </li>
           );
         })}
       </ul>
+      {more > 0 && <div className="sub">and {more} more {more === 1 ? 'step' : 'steps'}</div>}
+      {list.length === 1 && <div className="sub">That’s the last one</div>}
     </>
   );
 }

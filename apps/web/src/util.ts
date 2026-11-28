@@ -21,9 +21,10 @@ export function useMediaQuery(query: string): boolean {
   return matches;
 }
 
-/** Always minutes and seconds: 75 → "1:15", 9 → "0:09". For countdowns, so the width stays the same. */
+/** A countdown: 75 → "1:15"; under a minute just the seconds, 9 → "9". */
 export function timer(seconds: number): string {
   const s = Math.max(0, Math.ceil(seconds));
+  if (s < 60) return String(s);
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 }
 
