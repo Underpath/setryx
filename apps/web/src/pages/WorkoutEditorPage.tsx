@@ -328,6 +328,7 @@ export function WorkoutEditorPage() {
           onMoveDown={() => moveStep(editing.path, 1)}
           onDuplicate={() => duplicateStep(editing.path)}
           onRemove={() => removeStep(editing.path)}
+          onCuesSaved={(e) => setExercises((m) => ({ ...m, [e.id]: e }))}
         />
       )}
 

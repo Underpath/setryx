@@ -612,3 +612,6 @@ textarea.input { resize: vertical; min-height: 88px; line-height: 1.45; }
 .limits-group > legend { padding: 0; margin: 8px 0 4px; }
 .token-used { font-size: .875rem; font-weight: 600; margin-top: 2px; }
 .visually-hidden { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+.cues-editor { display: grid; gap: 8px; margin: 6px 0 10px; }
+.cues-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.cues-text { white-space: pre-line; }

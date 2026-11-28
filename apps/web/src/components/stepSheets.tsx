@@ -1,6 +1,7 @@
 import { type FormEvent, type ReactNode, useId, useState } from 'react';
 import type { Exercise, ExerciseStep, ExerciseType, RestStep, Superset } from '@setryx/shared';
-import { Field, Icon, LeaveDialog, Sheet, useBeforeUnload } from './ui.tsx';
+import { Field, Icon, LeaveDialog, Sheet, useBeforeUnload, useToast } from './ui.tsx';
+import { useSaveCues } from '../data.ts';
 import { ExerciseDetailSheet } from './exercises.tsx';
 
 /**
@@ -102,8 +103,11 @@ export function ExerciseStepSheet({
   onSave,
   onChangeExercise,
   onClose,
+  onCuesSaved,
   ...actions
-}: { step: ExerciseStep; exercise: Exercise | undefined; isNew: boolean; onSave: (s: ExerciseStep) => void; onChangeExercise: () => void; onClose: () => void } & StepActions) {
+}: { step: ExerciseStep; exercise: Exercise | undefined; isNew: boolean; onSave: (s: ExerciseStep) => void; onChangeExercise: () => void; onClose: () => void; onCuesSaved?: (e: Exercise) => void } & StepActions) {
+  const saveCues = useSaveCues();
+  const toast = useToast();
   const start = {
     targetType: step.targetType,
     reps: step.targetReps?.toString() ?? '',
@@ -111,7 +115,8 @@ export function ExerciseStepSheet({
     weight: step.targetWeight?.toString() ?? '',
     tempo: step.tempo ?? '',
     rir: step.rir ?? '',
-    notes: step.notes ?? '',
+    // Cues are the exercise's (shared by every workout); older steps may still carry their own.
+    notes: exercise?.cues ?? step.notes ?? '',
     equipmentNote: step.equipmentNote ?? '',
   };
   const [f, setF] = useState(start);
@@ -131,6 +136,13 @@ export function ExerciseStepSheet({
     if (f.weight.trim() && weight === null) errs.weight = 'Enter a number, like 8 or 22.5.';
     setErrors(errs);
     if (Object.keys(errs).length) return;
+    const cues = f.notes.trim() || null;
+    if (exercise && cues !== (exercise.cues ?? null)) {
+      saveCues.mutate(
+        { id: exercise.id, cues },
+        { onSuccess: ({ exercise: saved }) => onCuesSaved?.(saved), onError: (err) => toast(`Form cues weren’t saved: ${err.message}`) },
+      );
+    }
     onSave({
       ...step,
       targetType: f.targetType,
@@ -139,13 +151,21 @@ export function ExerciseStepSheet({
       targetWeight: weight,
       tempo: f.tempo.trim() || null,
       rir: f.rir.trim() || null,
-      notes: f.notes.trim() || null,
+      notes: null,
       equipmentNote: f.equipmentNote.trim() || null,
     });
   };
 
   // The details replace this sheet while open; the step's unsaved changes are kept for when they close.
-  if (info && exercise) return <ExerciseDetailSheet exercise={exercise} onClose={() => setInfo(false)} />;
+  if (info && exercise) {
+    return (
+      <ExerciseDetailSheet
+        exercise={exercise}
+        onClose={() => setInfo(false)}
+        onCuesSaved={(saved) => (set({ notes: saved.cues ?? '' }), onCuesSaved?.(saved))}
+      />
+    );
+  }
 
   return (
     <GuardedSheet title={exercise?.name ?? 'Exercise'} what="step" dirty={dirty} onApply={apply} onClose={onClose}>
@@ -181,7 +201,8 @@ export function ExerciseStepSheet({
           <Field label="Equipment" value={f.equipmentNote} onChange={(e) => set({ equipmentNote: e.target.value })} placeholder="Dumbbells, incline bench" hint="Shown on the checklist before you start." />
           <div className="field">
             <label htmlFor="step-notes">Form cues</label>
-            <textarea id="step-notes" className="input" rows={3} value={f.notes} onChange={(e) => set({ notes: e.target.value })} />
+            <textarea id="step-notes" className="input" rows={3} maxLength={2000} value={f.notes} onChange={(e) => set({ notes: e.target.value })} aria-describedby="step-notes-hint" />
+            <div className="hint" id="step-notes-hint">Saved with the exercise, so they show in every workout that uses it.</div>
           </div>
           {/* Both always shown, so nothing moves when the first change is made. Destructive actions go on the right. */}
           <div className="save-row">

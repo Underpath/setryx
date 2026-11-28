@@ -9,6 +9,7 @@ import {
 } from '@setryx/shared';
 import { type DB, now, tx } from './db.ts';
 import { getExercisesByIds } from './exercises.ts';
+import { absorbStepCues } from './cues.ts';
 import { HttpError } from './http.ts';
 
 type WorkoutRow = { id: string; user_id: string; name: string; icon: string; notes: string | null; created_at: string; updated_at: string };
@@ -76,6 +77,7 @@ export function getWorkout(db: DB, userId: string, id: string): Workout | null {
 
 export function createWorkout(db: DB, userId: string, f: WorkoutFields): Workout {
   assertExercisesUsable(db, userId, f.items);
+  f = { ...f, items: absorbStepCues(db, userId, f.items) };
   const id = randomUUID();
   const ts = now();
   tx(db, () => {
@@ -88,6 +90,7 @@ export function createWorkout(db: DB, userId: string, f: WorkoutFields): Workout
 export function replaceWorkout(db: DB, userId: string, id: string, f: WorkoutFields): Workout | null {
   if (!getWorkout(db, userId, id)) return null;
   assertExercisesUsable(db, userId, f.items);
+  f = { ...f, items: absorbStepCues(db, userId, f.items) };
   tx(db, () => {
     db.prepare('UPDATE workouts SET name = ?, icon = ?, notes = ?, updated_at = ? WHERE id = ? AND user_id = ?').run(f.name, f.icon, f.notes, now(), id, userId);
     saveItems(db, id, f.items);

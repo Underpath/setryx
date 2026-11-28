@@ -31,6 +31,7 @@ function migrate(db: DB, dataDir: string | ':memory:'): void {
     if (applied.has(m.version)) continue;
     tx(db, () => {
       db.exec(m.sql);
+      m.run?.(db);
       db.prepare('INSERT INTO schema_migrations (version, applied_at) VALUES (?, ?)').run(m.version, now());
     });
   }

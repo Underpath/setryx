@@ -2,7 +2,8 @@ import type { FastifyPluginAsync } from 'fastify';
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { z } from 'zod';
-import { exerciseInputSchema } from '@setryx/shared';
+import { exerciseCuesRequestSchema, exerciseInputSchema } from '@setryx/shared';
+import { setCues } from '../cues.ts';
 import { requireUser } from '../app.ts';
 import {
   archiveCustomExercise,
@@ -70,6 +71,15 @@ export const libraryRoutes: FastifyPluginAsync = async (app) => {
     const ex = updateCustomExercise(db, req.user!.id, req.params.id, body);
     if (!ex) throw new HttpError(404, 'not_found', 'Only your own exercises can be edited. Duplicate a library exercise to change it.');
     return { exercise: ex };
+  });
+
+  /** Your form cues for any exercise you can see, library ones included. Empty or null clears them. */
+  app.put<IdParams>('/exercises/:id/cues', async (req) => {
+    const { cues } = parse(exerciseCuesRequestSchema, req.body);
+    if (!getExercise(db, req.user!.id, req.params.id)) throw new HttpError(404, 'not_found', 'No such exercise.');
+    setCues(db, req.user!.id, req.params.id, cues);
+    const { ownerId: _o, archived: _a, ...exercise } = getExercise(db, req.user!.id, req.params.id)!;
+    return { exercise };
   });
 
   app.delete<IdParams>('/exercises/:id', async (req, reply) => {

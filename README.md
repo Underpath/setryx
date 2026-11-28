@@ -156,7 +156,7 @@ Agents like Claude can connect to Setryx over MCP at `http://<your-server>:38471
 claude mcp add --transport http setryx http://<your-server>:38471/mcp --header "Authorization: Bearer setryx_…"
 ```
 
-The agent gets tools to check what's next and your training summary; search exercises and read your history; create and edit workouts, targets and routines; and log a session done without the app. Exercises, workouts and routines can be named instead of given by id. A read-only token only gets the reading tools. Tools that delete or overwrite (updating an exercise or a workout, editing a routine) are marked so clients ask first, and sessions can't be deleted over MCP. MCP is off by default: an admin turns it on under **Settings → API and AI agents**. The API works with tokens either way.
+The agent gets tools to check what's next and your training summary; search exercises and read your history; create and edit workouts, targets and routines; set your form cues for an exercise; and log a session done without the app. Exercises, workouts and routines can be named instead of given by id. A read-only token only gets the reading tools. Tools that delete or overwrite (updating an exercise or a workout, editing a routine) are marked so clients ask first, and sessions can't be deleted over MCP. MCP is off by default: an admin turns it on under **Settings → API and AI agents**. The API works with tokens either way.
 
 ### Locked out?
 

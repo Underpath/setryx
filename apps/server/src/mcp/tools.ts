@@ -143,7 +143,7 @@ const exerciseFields = {
   weight: z.number().min(0).max(2000).optional().describe('Kilograms. For dumbbells: the weight of one dumbbell.'),
   tempo: text(20).optional().describe('Like 3-1-1-0.'),
   rir: text(10).optional().describe('Reps in reserve, like 2.'),
-  notes: text(2000).optional(),
+  notes: text(2000).optional().describe('Form cues. Saved on the exercise (added to any it already has), so they show in every workout that uses it.'),
   equipmentNote: text(200).optional().describe('Like “bench at 30°”.'),
 };
 const exerciseIn = z.object({
@@ -198,7 +198,7 @@ function toItems(ctx: Ctx, items: ItemIn[]): WorkoutItem[] {
   });
 }
 
-function fromItems(items: WorkoutItem[], exercises: Record<string, { name: string }>): unknown[] {
+function fromItems(items: WorkoutItem[], exercises: Record<string, { name: string; cues?: string | null }>): unknown[] {
   const one = (it: WorkoutItem): unknown => {
     if (it.kind === 'superset') return { id: it.id, superset: it.label, rounds: it.rounds, items: it.items.map(one) };
     if (it.kind === 'rest') return dropNulls({ id: it.id, rest: it.durationS, label: it.label });
@@ -211,7 +211,7 @@ function fromItems(items: WorkoutItem[], exercises: Record<string, { name: strin
       weight: it.targetWeight,
       tempo: it.tempo,
       rir: it.rir,
-      notes: it.notes,
+      cues: exercises[it.exerciseId]?.cues,
       equipmentNote: it.equipmentNote,
     });
   };
@@ -381,7 +381,7 @@ export const TOOLS: Tool[] = [
   {
     name: 'get_exercise',
     title: 'Get an exercise',
-    description: 'One exercise with its muscles, equipment and instructions.',
+    description: 'One exercise with its muscles, equipment, instructions and your form cues.',
     input: z.object({ exercise: ref('Exercise') }),
     async run(ctx, { exercise }) {
       const ex = exerciseResolver(ctx)(exercise);
@@ -514,6 +514,19 @@ export const TOOLS: Tool[] = [
       const body = { name: ex.name, defaultType: type ?? ex.defaultType, category: ex.category, primaryMuscles: ex.primaryMuscles, secondaryMuscles: ex.secondaryMuscles, equipment: ex.equipment, instructions: ex.instructions };
       for (const [k, v] of Object.entries(changes)) if (v !== undefined) (body as Record<string, unknown>)[k] = v;
       return (await ctx.api<{ exercise: Exercise }>('PUT', `/exercises/${enc(ex.id)}`, body)).exercise;
+    },
+  },
+  {
+    name: 'set_exercise_cues',
+    title: 'Set form cues',
+    description: 'Set your form cues for an exercise, library ones included. They replace the cues it has and show in every workout that uses it. Pass null to clear them.',
+    write: true,
+    destructive: true,
+    idempotent: true,
+    input: z.object({ exercise: ref('Exercise'), cues: text(2000).nullable() }),
+    async run(ctx, { exercise, cues }) {
+      const ex = exerciseResolver(ctx)(exercise);
+      return (await ctx.api<{ exercise: Exercise }>('PUT', `/exercises/${enc(ex.id)}/cues`, { cues })).exercise;
     },
   },
   {

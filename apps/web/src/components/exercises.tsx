@@ -1,6 +1,6 @@
 import { type FormEvent, useMemo, useState } from 'react';
 import type { Exercise, ExerciseInput, ExerciseType } from '@setryx/shared';
-import { type ExerciseFilters, useDeleteExercise, useExerciseFacets, useExerciseSearch, useSaveExercise } from '../data.ts';
+import { type ExerciseFilters, useDeleteExercise, useExerciseFacets, useExerciseSearch, useSaveCues, useSaveExercise } from '../data.ts';
 import { Field, FormError, Icon, LeaveDialog, Sheet, fieldErrors, useToast } from './ui.tsx';
 
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
@@ -87,12 +87,56 @@ export function ExercisePhotos({ images, name }: { images: string[]; name: strin
   );
 }
 
-export function ExerciseDetailSheet({ exercise, onClose, onEdit, onDuplicate, action }: { exercise: Exercise; onClose: () => void; onEdit?: () => void; onDuplicate?: () => void; action?: { label: string; onClick: () => void } }) {
+/** Your form cues for an exercise: shown, with Edit to change them in place. */
+export function CuesEditor({ exercise, onSaved }: { exercise: Exercise; onSaved?: (e: Exercise) => void }) {
+  const save = useSaveCues();
+  const toast = useToast();
+  const [cues, setCues] = useState(exercise.cues);
+  const [draft, setDraft] = useState<string | null>(null);
+  const id = `cues-${exercise.id}`;
+  const done = () =>
+    save.mutate(
+      { id: exercise.id, cues: draft?.trim() || null },
+      {
+        onSuccess: ({ exercise: saved }) => {
+          setCues(saved.cues);
+          setDraft(null);
+          onSaved?.(saved);
+          toast('Form cues saved');
+        },
+      },
+    );
+  return (
+    <div className="cues-editor">
+      <div className="cues-head">
+        <h3 className="h3">Your form cues</h3>
+        {draft === null && <button className="btn btn-quiet btn-sm" type="button" onClick={() => setDraft(cues ?? '')}>{cues ? 'Edit' : 'Add'}</button>}
+      </div>
+      {draft === null ? (
+        cues ? <p className="cues-text">{cues}</p> : <p className="small muted">None yet. They show in every workout that uses this exercise.</p>
+      ) : (
+        <>
+          <label className="visually-hidden" htmlFor={id}>Your form cues</label>
+          <textarea id={id} className="input" rows={4} maxLength={2000} value={draft} onChange={(e) => setDraft(e.target.value)} autoFocus />
+          <p className="hint">Shown in every workout that uses this exercise.</p>
+          <FormError error={save.error} />
+          <div className="save-row">
+            <button className="btn btn-primary" type="button" onClick={done} disabled={save.isPending}>Save cues</button>
+            <button className="btn" type="button" onClick={() => (setDraft(null), save.reset())}>Cancel</button>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+export function ExerciseDetailSheet({ exercise, onClose, onEdit, onDuplicate, action, onCuesSaved }: { exercise: Exercise; onClose: () => void; onEdit?: () => void; onDuplicate?: () => void; action?: { label: string; onClick: () => void }; onCuesSaved?: (e: Exercise) => void }) {
   return (
     <Sheet title={exercise.name} onClose={onClose}>
       {exerciseMeta(exercise) && <p className="muted">{exerciseMeta(exercise)}</p>}
       {exercise.secondaryMuscles.length > 0 && <p className="small muted">Also works: {exercise.secondaryMuscles.map(cap).join(', ')}</p>}
       <ExercisePhotos images={exercise.images} name={exercise.name} />
+      <CuesEditor exercise={exercise} onSaved={onCuesSaved} />
       {exercise.instructions.length > 0 ? (
         <ol className="instructions">{exercise.instructions.map((s, i) => <li key={i}>{s}</li>)}</ol>
       ) : (

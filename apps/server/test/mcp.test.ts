@@ -202,3 +202,16 @@ test('own exercises: create, update, delete; library ones are protected', async 
   const [bad] = await call('create_exercise', { name: 42 });
   assert.match(bad, /Some arguments need fixing/);
 });
+
+test('form cues: notes on a step land on the exercise, and set_exercise_cues replaces them', async () => {
+  const w = (await ok('create_workout', { name: 'Push', items: [{ exercise: bench, reps: 5, weight: 50, notes: 'Elbows at 45°' }] })) as { items: { cues?: string; notes?: string }[] };
+  assert.equal(w.items[0]!.cues, 'Elbows at 45°');
+  assert.equal(w.items[0]!.notes, undefined);
+  const ex = (await ok('set_exercise_cues', { exercise: bench, cues: 'Feet planted' })) as { cues: string };
+  assert.equal(ex.cues, 'Feet planted');
+  assert.equal(((await ok('get_exercise', { exercise: bench })) as { cues: string }).cues, 'Feet planted');
+  const got = (await ok('get_workout', { workout: 'Push' })) as { items: { cues?: string }[] };
+  assert.equal(got.items[0]!.cues, 'Feet planted');
+  const [, isError] = await call('set_exercise_cues', { exercise: bench, cues: 'x' }, readToken);
+  assert.equal(isError, true, 'read tokens can’t');
+});

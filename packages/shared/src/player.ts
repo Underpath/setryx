@@ -11,6 +11,8 @@ export type SnapshotExercise = {
   images?: string[];
   primaryMuscles?: string[];
   secondaryMuscles?: string[];
+  /** Your form cues, kept with the exercise; absent in sessions started before they moved there. */
+  cues?: string | null;
 };
 
 export type SetLog = {

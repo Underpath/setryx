@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import {
+  exerciseCuesRequestSchema,
   exerciseInputSchema,
   exerciseSchema,
   routineActiveSchema,
@@ -50,6 +51,7 @@ const schemas: Record<string, Json> = {
   Error: obj({ error: { ...str, description: 'A stable code, like not_found or invalid_input.' }, message: str, fields: { type: 'object', additionalProperties: str } }, ['error', 'message']),
   Exercise: fromZod(exerciseSchema),
   ExerciseInput: fromZod(exerciseInputSchema),
+  ExerciseCues: fromZod(exerciseCuesRequestSchema),
   WorkoutItem: fromZod(workoutItemSchema),
   WorkoutInput: fromZod(workoutInputSchema),
   Workout: obj({ id: str, name: str, icon: str, notes: nullable(str), items: arr(ref('WorkoutItem')), createdAt: date, updatedAt: date }),
@@ -165,6 +167,17 @@ const paths: Json = {
       summary: 'Remove one of your own exercises',
       description: 'It stays in past sessions and workouts that use it.',
       responses: noContent,
+    }),
+  },
+  '/exercises/{id}/cues': {
+    parameters: [idParam('exercise')],
+    put: op({
+      tags: ['Exercises'],
+      write: true,
+      summary: 'Set your form cues for an exercise',
+      description: 'Works for library exercises too. The cues show in every workout that uses the exercise. Null or an empty string clears them.',
+      requestBody: body('ExerciseCues'),
+      responses: ok('Saved.', obj({ exercise: ref('Exercise') })),
     }),
   },
 

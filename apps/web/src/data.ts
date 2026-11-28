@@ -47,6 +47,18 @@ export function useSaveExercise() {
   });
 }
 
+/** Saves your form cues for an exercise; they show in every workout that uses it. */
+export function useSaveCues() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, cues }: { id: string; cues: string | null }) => api.put<{ exercise: Exercise }>(`/exercises/${id}/cues`, { cues }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['exercises'] });
+      qc.invalidateQueries({ queryKey: ['workout'] });
+    },
+  });
+}
+
 export function useDeleteExercise() {
   const qc = useQueryClient();
   return useMutation({

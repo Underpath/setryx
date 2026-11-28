@@ -15,6 +15,8 @@ type ExerciseRow = {
   instructions: string;
   images: string;
   archived: number;
+  /** This person's form cues, from exercise_cues; absent where not joined. */
+  cues?: string | null;
 };
 
 const arr = (s: string): string[] => {
@@ -38,6 +40,7 @@ function toExercise(r: ExerciseRow): Exercise {
     equipment: arr(r.equipment),
     instructions: arr(r.instructions),
     images: arr(r.images),
+    cues: r.cues ?? null,
   };
 }
 
@@ -99,6 +102,8 @@ export function seedExercises(db: DB): { changed: boolean; count: number } {
 
 /** Exercises the user can see: the library plus their own custom ones. */
 const VISIBLE = '(owner_id IS NULL OR owner_id = ?)';
+/** Exercise rows with this person's cues. Takes the user id as its first parameter. */
+const WITH_CUES = 'SELECT exercises.*, c.cues AS cues FROM exercises LEFT JOIN exercise_cues c ON c.exercise_id = exercises.id AND c.user_id = ?';
 
 export type ExerciseQuery = { q?: string; muscle?: string; equipment?: string; custom?: boolean; limit: number; offset: number };
 
@@ -126,16 +131,16 @@ export function searchExercises(db: DB, userId: string, query: ExerciseQuery): {
   const first = query.q ? normalizeName(query.q) : '';
   const rows = db
     .prepare(
-      `SELECT * FROM exercises WHERE ${whereSql}
+      `${WITH_CUES} WHERE ${whereSql}
        ORDER BY (owner_id IS NULL), (name_norm NOT LIKE ?), name COLLATE NOCASE
        LIMIT ? OFFSET ?`,
     )
-    .all(...params, `${first}%`, query.limit, query.offset) as ExerciseRow[];
+    .all(userId, ...params, `${first}%`, query.limit, query.offset) as ExerciseRow[];
   return { exercises: rows.map(toExercise), total };
 }
 
 export function listAllVisible(db: DB, userId: string): Exercise[] {
-  return (db.prepare(`SELECT * FROM exercises WHERE ${VISIBLE} AND archived = 0`).all(userId) as ExerciseRow[]).map(toExercise);
+  return (db.prepare(`${WITH_CUES} WHERE ${VISIBLE} AND archived = 0`).all(userId, userId) as ExerciseRow[]).map(toExercise);
 }
 
 export function exerciseFacets(db: DB, userId: string): { muscles: string[]; equipment: string[] } {
@@ -158,14 +163,14 @@ export function getExercisesByIds(db: DB, userId: string, ids: string[]): Record
   const out: Record<string, Exercise> = {};
   if (!ids.length) return out;
   const rows = db
-    .prepare(`SELECT * FROM exercises WHERE ${VISIBLE} AND id IN (${ids.map(() => '?').join(',')})`)
-    .all(userId, ...ids) as ExerciseRow[];
+    .prepare(`${WITH_CUES} WHERE ${VISIBLE} AND exercises.id IN (${ids.map(() => '?').join(',')})`)
+    .all(userId, userId, ...ids) as ExerciseRow[];
   for (const r of rows) out[r.id] = toExercise(r);
   return out;
 }
 
 export function getExercise(db: DB, userId: string, id: string): (Exercise & { ownerId: string | null; archived: boolean }) | null {
-  const r = db.prepare(`SELECT * FROM exercises WHERE ${VISIBLE} AND id = ?`).get(userId, id) as ExerciseRow | undefined;
+  const r = db.prepare(`${WITH_CUES} WHERE ${VISIBLE} AND exercises.id = ?`).get(userId, userId, id) as ExerciseRow | undefined;
   return r ? { ...toExercise(r), ownerId: r.owner_id, archived: r.archived === 1 } : null;
 }
 
@@ -213,5 +218,5 @@ export function archiveCustomExercise(db: DB, userId: string, id: string): boole
 }
 
 export function customExercisesOf(db: DB, userId: string): Exercise[] {
-  return (db.prepare('SELECT * FROM exercises WHERE owner_id = ? AND archived = 0 ORDER BY name COLLATE NOCASE').all(userId) as ExerciseRow[]).map(toExercise);
+  return (db.prepare(`${WITH_CUES} WHERE owner_id = ? AND archived = 0 ORDER BY name COLLATE NOCASE`).all(userId, userId) as ExerciseRow[]).map(toExercise);
 }

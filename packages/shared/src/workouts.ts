@@ -16,8 +16,12 @@ export const exerciseSchema = z.object({
   equipment: z.array(z.string()),
   instructions: z.array(z.string()),
   images: z.array(z.string()),
+  /** The signed-in person's form cues for this exercise, shown in every workout that uses it. */
+  cues: z.string().nullable(),
 });
 export type Exercise = z.infer<typeof exerciseSchema>;
+
+export const exerciseCuesRequestSchema = z.object({ cues: z.string().max(2000, 'Use at most 2000 characters.').nullable() });
 
 const shortList = z.array(z.string().trim().min(1).max(60)).max(20);
 

@@ -167,6 +167,8 @@ export const workoutRoutes: FastifyPluginAsync = async (app) => {
       // Library exercises are referenced by id; custom ones are included in full.
       exercises: customExercisesOf(db, userId),
       libraryExercises: Object.values(used).filter((e) => !e.isCustom).map((e) => ({ id: e.id, name: e.name })),
+      // Your form cues for any exercise, library ones included.
+      exerciseCues: db.prepare('SELECT exercise_id AS exerciseId, cues FROM exercise_cues WHERE user_id = ? ORDER BY exercise_id').all(userId),
       workouts,
       routines: listRoutines(db, userId).map(({ runs: _runs, ...r }) => r),
     };

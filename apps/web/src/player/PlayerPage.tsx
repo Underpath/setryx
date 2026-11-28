@@ -92,7 +92,7 @@ function NewSession({ user, workoutId }: { user: PublicUser; workoutId: string }
     const exercises: Record<string, SnapshotExercise> = {};
     for (const [id, e] of Object.entries(w.data.exercises)) exercises[id] = {
       name: e.name, equipment: e.equipment, instructions: e.instructions,
-      images: e.images, primaryMuscles: e.primaryMuscles, secondaryMuscles: e.secondaryMuscles,
+      images: e.images, primaryMuscles: e.primaryMuscles, secondaryMuscles: e.secondaryMuscles, cues: e.cues,
     };
     const { workout } = w.data;
     return createPlayer({
@@ -482,6 +482,8 @@ function NextLine({ step, name }: { step: FlatStep | null; name?: string }) {
 }
 
 function CuesBlock({ step, exercise, compact }: { step: Extract<FlatStep, { kind: 'exercise' }>; exercise?: SnapshotExercise; compact?: boolean }) {
+  // The exercise's cues; sessions started before cues moved to exercises have them on the step.
+  const cues = exercise?.cues ?? step.notes;
   const equipment = step.equipmentNote ?? exercise?.equipment.map((e) => e[0]!.toUpperCase() + e.slice(1)).join(', ');
   return (
     <div className={`cues-block${compact ? ' compact' : ''}`}>
@@ -491,12 +493,12 @@ function CuesBlock({ step, exercise, compact }: { step: Extract<FlatStep, { kind
           <b>Works:</b> {[...exercise.primaryMuscles, ...(exercise.secondaryMuscles ?? [])].map((m) => m[0]!.toUpperCase() + m.slice(1)).join(', ')}
         </p>
       )}
-      {step.notes && <p>{step.notes}</p>}
+      {cues && <p className="cues-text">{cues}</p>}
       {!compact && equipment && <p className="small"><b>Equipment:</b> {equipment}</p>}
       {!compact && exercise && exercise.instructions.length > 0 && (
         <ol className="instructions">{exercise.instructions.map((s, i) => <li key={i}>{s}</li>)}</ol>
       )}
-      {!compact && !step.notes && !equipment && !exercise?.instructions.length && !exercise?.images?.length && <p className="muted">No details for this exercise.</p>}
+      {!compact && !cues && !equipment && !exercise?.instructions.length && !exercise?.images?.length && <p className="muted">No details for this exercise.</p>}
     </div>
   );
 }

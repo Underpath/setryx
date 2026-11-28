@@ -1,5 +1,8 @@
+import type { DB } from './db.ts';
+
 // Append-only. Never edit a migration that has shipped; add a new one.
-export const migrations: { version: number; sql: string }[] = [
+// `run`, when present, runs after `sql` in the same transaction.
+export const migrations: { version: number; sql: string; run?: (db: DB) => void }[] = [
   {
     version: 1,
     sql: `
@@ -201,5 +204,49 @@ export const migrations: { version: number; sql: string }[] = [
       );
       CREATE INDEX known_devices_user ON known_devices(user_id, last_used_at);
     `,
+  },
+  {
+    version: 8,
+    sql: `
+      -- Form cues, one set per person per exercise (see cues.ts).
+      CREATE TABLE exercise_cues (
+        user_id      TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        exercise_id  TEXT NOT NULL,
+        cues         TEXT NOT NULL,
+        updated_at   TEXT NOT NULL,
+        PRIMARY KEY (user_id, exercise_id)
+      );
+    `,
+    // Cues used to be on each workout step. Each exercise gets the cues from
+    // its steps (different ones joined on separate lines), and steps drop theirs.
+    run(db) {
+      const rows = db
+        .prepare(
+          `SELECT w.user_id AS user_id, i.workout_id AS workout_id, i.id AS id, i.exercise_id AS exercise_id, i.data AS data
+           FROM workout_items i JOIN workouts w ON w.id = i.workout_id
+           WHERE i.kind = 'exercise' ORDER BY w.created_at, i.parent_id IS NOT NULL, i.position`,
+        )
+        .all() as { user_id: string; workout_id: string; id: string; exercise_id: string; data: string }[];
+      const found = new Map<string, { user: string; exercise: string; lines: string[] }>();
+      const clear = db.prepare('UPDATE workout_items SET data = ? WHERE workout_id = ? AND id = ?');
+      for (const r of rows) {
+        let data: { notes?: string | null };
+        try {
+          data = JSON.parse(r.data);
+        } catch {
+          continue;
+        }
+        const note = data.notes?.trim();
+        if (!note) continue;
+        const key = `${r.user_id}\u0000${r.exercise_id}`;
+        const entry = found.get(key) ?? { user: r.user_id, exercise: r.exercise_id, lines: [] };
+        if (!entry.lines.includes(note)) entry.lines.push(note);
+        found.set(key, entry);
+        clear.run(JSON.stringify({ ...data, notes: null }), r.workout_id, r.id);
+      }
+      const ins = db.prepare('INSERT INTO exercise_cues (user_id, exercise_id, cues, updated_at) VALUES (?, ?, ?, ?)');
+      const at = new Date().toISOString();
+      for (const e of found.values()) ins.run(e.user, e.exercise, e.lines.join('\n').slice(0, 2000), at);
+    },
   },
 ];
